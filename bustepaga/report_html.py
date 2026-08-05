@@ -325,7 +325,7 @@ def _riquadri_sintesi(analisi: Analisi) -> str:
             _tessera(
                 "Tendenza del netto",
                 f"{'+' if pendenza > 0 else ''}{formatta_euro(pendenza)} €",
-                "al mese, mensilità extra escluse",
+                "al mese, sui soli mesi pieni",
                 "su" if pendenza > 0 else ("giu" if pendenza < 0 else ""),
             )
         )
@@ -351,7 +351,12 @@ def _tabella_mensile(analisi: Analisi) -> str:
         pct = None if not precedente or netto is None else 100.0 * (netto - precedente) / abs(precedente)
         aliquota = busta.aliquota_effettiva
         classe = "delta-su" if (delta or 0) > 0 else ("delta-giu" if (delta or 0) < 0 else "")
-        extra = ' <span class="pallino" title="mensilità aggiuntiva">✱</span>' if busta.periodo in analisi.mensilita_aggiuntive else ""
+        if busta.periodo in analisi.mensilita_aggiuntive:
+            extra = ' <span class="pallino" title="mese fuori scala: tredicesima, premio o arretrati">✱</span>'
+        elif busta.periodo in analisi.mesi_parziali:
+            extra = ' <span class="pallino" title="mese lavorato solo in parte">◦</span>'
+        else:
+            extra = ""
         righe.append(
             f"<tr><th scope='row'>{_esc(formatta_periodo(busta.periodo))}{extra}</th>"
             f"<td>{formatta_euro(busta.get('totale_competenze'))}</td>"
@@ -366,11 +371,12 @@ def _tabella_mensile(analisi: Analisi) -> str:
     return f"""
 <section class="scheda">
   <h3>Tutti i dati, mese per mese</h3>
-  <p class="sottotitolo">Gli stessi numeri dei grafici, in forma leggibile e copiabile.</p>
+  <p class="sottotitolo">Gli stessi numeri dei grafici, in forma leggibile e copiabile.
+  ✱ mese fuori scala (tredicesima, premio, arretrati) · ◦ mese lavorato solo in parte.</p>
   <div class="scorri">
   <table>
     <thead><tr><th scope="col">Mese</th><th scope="col">Lordo</th><th scope="col">Contributi</th>
-    <th scope="col">Imposte</th><th scope="col">Trattenute</th><th scope="col">Netto</th>
+    <th scope="col">Imposte e altro</th><th scope="col">Trattenute</th><th scope="col">Netto</th>
     <th scope="col">Δ netto</th><th scope="col">Δ %</th><th scope="col">Prelievo</th></tr></thead>
     <tbody>{"".join(righe)}</tbody>
   </table>
@@ -491,12 +497,12 @@ def _grafici(analisi: Analisi) -> str:
             pezzi.append(
                 grafico_impilato(
                     "Dove finisce il lordo",
-                    "Ogni colonna e' una busta: quanto resta in tasca, quanto va in contributi e quanto in imposte.",
+                    "Ogni colonna e' una busta: quanto resta in tasca, quanto va in contributi e quanto in imposte e altre trattenute. I tre pezzi sommati fanno il lordo.",
                     periodi,
                     [
                         ("Netto in busta", netti),
                         ("Contributi INPS", contributi),
-                        ("Imposte (IRPEF + addizionali)", imposte),
+                        ("Imposte e altre trattenute", imposte),
                     ],
                 )
             )

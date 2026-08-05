@@ -20,14 +20,17 @@ non serve la rete.
 - **Mostra l'andamento**: medie, mediane, minimi e massimi, totali per anno,
   tendenza del netto, prelievo effettivo (quanto del lordo se ne va in contributi
   e imposte), proiezione su dodici mesi.
-- **Segnala le stranezze**: scostamenti oltre soglia, voci sparite, buste in cui
-  i conti non tornano, cambi di livello o di CCNL.
+- **Segnala le stranezze**: scostamenti oltre soglia, voci mai viste prima o
+  scomparse per sempre, prelievo fuori linea, buste in cui i conti non tornano,
+  cambi di livello o di CCNL.
 - **Produce** un report a terminale, un report HTML con i grafici (un file solo,
   si apre con doppio clic anche senza internet) ed esportazioni in CSV/JSON.
 
-Le mensilità aggiuntive (tredicesima, quattordicesima) vengono riconosciute ed
-escluse dal calcolo della tendenza, altrimenti dicembre farebbe sembrare che lo
-stipendio raddoppi ogni anno.
+Due tipi di mese vengono riconosciuti ed esclusi dal calcolo della tendenza:
+i **mesi fuori scala** (tredicesima, premi, arretrati) e i **mesi parziali**
+(assunzione, cessazione, assenze non retribuite). Senza questa distinzione
+dicembre farebbe sembrare che lo stipendio raddoppi, e il mese di assunzione
+che sia crollato.
 
 ---
 
@@ -72,6 +75,31 @@ python3 analizza_buste.py --demo --html report.html
 | `--dump-testo CARTELLA` | salva il testo estratto da ogni PDF, per capire cosa non viene letto |
 | `--demo` | usa buste finte di esempio |
 | `--silenzioso` | non stampa il report a terminale |
+
+---
+
+## Formati di cedolino
+
+La lettura funziona su due livelli:
+
+1. **Motore generico** (`pattern.py` + `estrazione.py`): cerca le etichette e
+   l'importo che le sta vicino, tenendo conto dell'incolonnamento — così la
+   colonna delle ore o il codice della voce non vengono scambiati per un
+   importo. Va bene per la maggior parte dei cedolini.
+
+2. **Lettori dedicati** (`formati.py`): alcuni moduli mettono i totali in
+   blocchi dove l'etichetta e il valore non si toccano (intestazioni su una
+   riga, valori sotto e disallineati). Per quelli serve sapere com'è fatto il
+   modulo. Oggi c'è il lettore per **ADP – Libro Unico** (usato tra gli altri
+   da Iveco/IDV), che legge il blocco INPS, quello IRPEF, i progressivi, il
+   TFR e il saldo ferie/permessi.
+
+   Per aggiungerne uno: una funzione che riconosce il formato, una che estrae i
+   valori, e una riga in `FORMATI`. I valori del lettore dedicato hanno la
+   precedenza su quelli del motore generico.
+
+Il residuo di ferie e permessi, quando il cedolino non lo stampa, viene
+ricavato da *maturato + residuo anno precedente − goduto*.
 
 ---
 
@@ -133,9 +161,10 @@ bustepaga/
   analisi.py             confronti, statistiche, anomalie
   report_testo.py        report a terminale
   report_html.py         report HTML con i grafici SVG
+  formati.py             lettori dedicati a moduli specifici (ADP...)
   demo.py                buste finte per le prove
   cli.py                 riga di comando
-tests/                   test, si eseguono senza dipendenze esterne
+tests/                   68 test, si eseguono senza dipendenze esterne
 buste/                   qui vanno i tuoi PDF (esclusi da git)
 ```
 
@@ -166,5 +195,7 @@ Per questo:
 I valori vengono letti automaticamente da documenti pensati per gli occhi, non
 per i programmi. Il controllo di quadratura (*lordo − trattenute = netto*)
 intercetta gli errori più grossi e li segnala, ma in caso di dubbio fa fede il
-PDF originale. Questo strumento serve a farsi domande, non a sostituire il
+PDF originale. Dove è possibile i numeri si ricavano per differenza dai totali
+invece che sommando le singole voci: i totali quadrano sempre, le voci si
+prestano a doppi conteggi (rate, conguagli, importi da rateizzare). Questo strumento serve a farsi domande, non a sostituire il
 consulente del lavoro.

@@ -15,6 +15,7 @@ from datetime import date
 from pathlib import Path
 from typing import NamedTuple
 
+from . import formati
 from .modello import (
     MESI,
     MESI_ABBR,
@@ -96,8 +97,12 @@ def _testo_pdftotext(percorso: Path) -> str:
 # periodo di riferimento
 # ---------------------------------------------------------------------------
 
+# Solo diciture che indicano davvero il mese di paga: un generico "MESE"
+# prendeva per buone cose come «CREDITO D.L. 3/2020 MESE».
 _ETICHETTA_PERIODO = re.compile(
-    r"(?:PERIODO|MESE|COMPETENZA|RETRIBUZIONE\s+DEL|ELABORAZIONE)[^\n]{0,40}"
+    r"(?:PERIODO\s+(?:DI\s+)?(?:RETRIBUZIONE|PAGA|COMPETENZA|RIFERIMENTO)"
+    r"|MESE\s+(?:DI\s+)?(?:COMPETENZA|RIFERIMENTO|PAGA|RETRIBUZIONE)"
+    r"|MESE\s*/\s*ANNO|RETRIBUZIONE\s+DEL|COMPETENZE\s+DEL)[^\n]{0,40}"
 )
 _MESE_ANNO_TESTO = re.compile(
     r"\b(" + "|".join(MESI) + r")\w*\s*[/\- ]?\s*(\d{4})\b", re.IGNORECASE
@@ -234,28 +239,58 @@ def _numero_vicino(
     """Il numero associato all'etichetta: dopo di essa, prima di essa, o sotto."""
     riga = contesto.righe[indice]
     apertura, chiusura = contesto.finestra(indice, inizio, fine)
-
     dopo = _numeri_posizionati(riga[fine:chiusura], fine)
-    if dopo:
+    # Il valore si cerca nella riga sotto solo quando l'etichetta e' una pura
+    # intestazione. Se sulla sua riga un importo c'e' gia', quello e' il suo:
+    # andare a pescare sotto vorrebbe dire prendere il numero di un'altra voce.
+    sotto = (
+        _numero_incolonnato(contesto, indice, inizio, fine)
+        if not [n for n in _numeri_posizionati(riga) if not _e_codice(riga, n)]
+        else None
+    )
+
+    if contesto.colonne and campo.colonna:
+        # Cedolino incolonnato: un importo sta per forza sotto COMPETENZE o
+        # TRATTENUTE. Prima si cerca dopo l'etichetta, poi su tutta la riga
+        # (la descrizione della voce puo' contenere altre parole-etichetta).
+        # Se in quella colonna non c'e' niente, meglio nessun valore che un
+        # numero preso dalla colonna sbagliata (codice voce, ore, quantita').
         scelto = _per_colonna(campo, contesto, dopo)
-        if scelto is not None:
-            return scelto
+        if scelto is None:
+            scelto = _per_colonna(campo, contesto, _numeri_posizionati(riga))
+        return scelto if scelto is not None else sotto
+
+    if dopo:
         return dopo[0].valore if campo.posizione == "primo" else dopo[-1].valore
 
-    prima = _numeri_posizionati(riga[apertura:inizio], apertura)
+    prima = [
+        n
+        for n in _numeri_posizionati(riga[apertura:inizio], apertura)
+        if not _e_codice(riga, n)
+    ]
     if prima:
         return prima[-1].valore
 
-    return _numero_incolonnato(contesto, indice, inizio, fine)
+    return sotto
+
+
+def _e_codice(riga: str, numero: Numero) -> bool:
+    """Il numero di voce a inizio riga non e' un importo."""
+    codice = _CODICE_INIZIALE.match(riga)
+    return bool(codice) and numero.inizio < codice.end()
+
+
+def _centro_colonna(campo: Campo, contesto: _Contesto) -> float | None:
+    if not contesto.colonne or not campo.colonna:
+        return None
+    return contesto.colonne[0] if campo.colonna == "competenze" else contesto.colonne[1]
 
 
 def _per_colonna(campo: Campo, contesto: _Contesto, candidati: list[Numero]) -> float | None:
     """Sceglie il numero incolonnato sotto COMPETENZE o TRATTENUTE."""
-    if len(candidati) < 2 or not contesto.colonne or not campo.colonna:
+    centro_colonna = _centro_colonna(campo, contesto)
+    if not candidati or centro_colonna is None:
         return None
-    centro_colonna = (
-        contesto.colonne[0] if campo.colonna == "competenze" else contesto.colonne[1]
-    )
     migliore = min(candidati, key=lambda n: abs(n.centro - centro_colonna))
     if abs(migliore.centro - centro_colonna) <= TOLLERANZA_COLONNA:
         return migliore.valore
@@ -265,9 +300,16 @@ def _per_colonna(campo: Campo, contesto: _Contesto, candidati: list[Numero]) -> 
 def _numero_incolonnato(
     contesto: _Contesto, indice: int, inizio: int, fine: int
 ) -> float | None:
-    """Etichetta su una riga e valore incolonnato in quella sotto."""
+    """Etichetta su una riga e valore incolonnato in quella sotto.
+
+    Vale per le intestazioni dei riepiloghi. Una riga di voce numerata non e'
+    mai il valore dell'etichetta di sopra: la si salta, altrimenti il codice
+    della voce successiva passa per un importo.
+    """
     centro_etichetta = (inizio + fine) / 2
     for successiva in contesto.righe[indice + 1 : indice + 3]:
+        if _CODICE_INIZIALE.match(successiva):
+            continue
         candidati = _numeri_posizionati(successiva)
         if not candidati:
             continue
@@ -299,7 +341,7 @@ def estrai_voci(righe: list[str]) -> list[Voce]:
     colonne = _intestazione_colonne(righe)
     prima_riga = colonne[2] + 1 if colonne else 0
     voci: list[Voce] = []
-    for riga in righe[prima_riga:]:
+    for riga in righe[prima_riga:_fine_parte_retributiva(righe)]:
         if len(riga.strip()) < 6:
             continue
         if re.search(r"TOT(?:ALE|\.)?\s+(?:COMPETENZE|TRATTENUTE|RITENUTE)", riga):
@@ -319,12 +361,44 @@ def estrai_voci(righe: list[str]) -> list[Voce]:
             competenza = numeri[-1].valore
         if competenza is None and trattenuta is None:
             continue
-        descrizione = _descrizione_voce(riga, numeri[0].inizio)
-        if descrizione:
+        # la descrizione arriva fino al primo importo: il codice voce a inizio
+        # riga e' un numero, ma non e' un importo
+        primo_importo = next(
+            (n.inizio for n in numeri if not _e_codice(riga, n)), numeri[0].inizio
+        )
+        descrizione = _descrizione_voce(riga, primo_importo)
+        if descrizione and descrizione.lower() not in MESI:
             voci.append(
-                Voce(descrizione=descrizione, competenza=competenza, trattenuta=trattenuta)
+                Voce(
+                    descrizione=descrizione,
+                    competenza=competenza,
+                    trattenuta=trattenuta,
+                    con_codice=bool(_CODICE_INIZIALE.match(riga)),
+                )
             )
-    return voci
+    return _solo_voci_vere(voci)
+
+
+def _solo_voci_vere(voci: list[Voce]) -> list[Voce]:
+    """Se il cedolino numera le voci, tiene solo quelle numerate.
+
+    Nei cedolini con il codice voce le righe dei riepiloghi (IMPONIBILE,
+    TRATTENUTE, QUOTA TFR...) non ce l'hanno: senza questo filtro finirebbero
+    tra le voci e comparirebbero e sparirebbero a ogni mese.
+    """
+    numerate = [v for v in voci if v.con_codice]
+    return numerate if len(numerate) >= 3 else voci
+
+
+_FINE_RETRIBUTIVA = re.compile(r"SEZIONE\s+PRESENZE|PRESENZE\s*/\s*ASSENZE")
+
+
+def _fine_parte_retributiva(righe: list[str]) -> int:
+    """Dove finiscono le voci di paga: il calendario presenze non e' una voce."""
+    for indice, riga in enumerate(righe):
+        if _FINE_RETRIBUTIVA.search(riga):
+            return indice
+    return len(righe)
 
 
 def _intestazione_colonne(righe: list[str]) -> tuple[float, float, int] | None:
@@ -349,6 +423,8 @@ def _colonne_competenze_trattenute(righe: list[str]) -> tuple[float, float] | No
 def _descrizione_voce(riga: str, fino_a: int) -> str:
     testo = _CODICE_INIZIALE.sub("", riga[:fino_a]).strip(" .-:")
     testo = re.sub(r"\s{2,}", " ", testo)
+    # le colonne di segnalazione (S, F, asterischi) non fanno parte del nome
+    testo = re.sub(r"[\s*]+$", "", testo)
     if len(testo) < 3 or not re.search(r"[A-Z]{3}", testo):
         return ""
     return testo[:60].strip()
@@ -381,6 +457,13 @@ def busta_da_testo(testo_grezzo: str, nome_file: str, motore: str = "testo") -> 
     busta.valori = estrai_valori(righe)
     busta.voci = estrai_voci(righe)
     busta.anagrafica = estrai_anagrafica(normalizzato)
+
+    # Un lettore dedicato al formato, se lo riconosce, sa leggere i blocchi che
+    # il motore generico non puo' indovinare: i suoi valori hanno la precedenza.
+    formato = formati.riconosci(righe)
+    if formato is not None:
+        busta.formato = formato.nome
+        busta.valori.update(formato.estrai(righe))
 
     if busta.periodo is None:
         busta.avvisi.append("periodo non riconosciuto: rinomina il file come 2025-03.pdf")

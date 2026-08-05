@@ -57,7 +57,13 @@ def riepilogo_mensile(analisi: Analisi) -> str:
         delta_pct = (
             None if not precedente or netto is None else 100.0 * (netto - precedente) / abs(precedente)
         )
-        marcatore = " ✱" if busta.periodo in analisi.mensilita_aggiuntive else ""
+        marcatore = (
+            " ✱"
+            if busta.periodo in analisi.mensilita_aggiuntive
+            else " ◦"
+            if busta.periodo in analisi.mesi_parziali
+            else ""
+        )
         aliquota = busta.aliquota_effettiva
         righe.append(
             [
@@ -76,7 +82,9 @@ def riepilogo_mensile(analisi: Analisi) -> str:
         allinea_dx={1, 2, 3, 4, 5, 6},
     )
     if analisi.mensilita_aggiuntive:
-        testo += "\n  ✱ mensilità aggiuntiva (tredicesima/quattordicesima o simili)\n"
+        testo += "\n  ✱ mese fuori scala: tredicesima, premio o arretrati\n"
+    if analisi.mesi_parziali:
+        testo += "  ◦ mese lavorato solo in parte (assunzione, cessazione, assenze)\n"
     return testo
 
 
@@ -115,8 +123,8 @@ def andamento(analisi: Analisi) -> str:
         verso = "in crescita" if pendenza > 0 else ("in calo" if pendenza < 0 else "stabile")
         parti.append(
             f"  Netto {verso}: {_delta(pendenza)} € al mese in media "
-            f"({_delta_pct(variazione)} dal primo all'ultimo mese, "
-            "mensilità aggiuntive escluse)."
+            f"({_delta_pct(variazione)} dal primo all'ultimo mese pieno; "
+            "mensilità aggiuntive e mesi parziali esclusi)."
         )
     statistica_netto = analisi.statistiche.get("netto")
     if statistica_netto:

@@ -128,6 +128,43 @@ class TestInquadramento(unittest.TestCase):
         self.assertFalse([a for a in analisi.anomalie if "cambiato" in a.titolo])
 
 
+class TestMesiParziali(unittest.TestCase):
+    def test_riconosce_il_mese_di_assunzione(self):
+        analisi = analizza(
+            [
+                busta(2024, 12, 228.0, 2963.0),
+                busta(2025, 1, 2140.0, 3055.0),
+                busta(2025, 2, 2267.0, 3070.0),
+                busta(2025, 3, 2192.0, 3125.0),
+            ]
+        )
+        self.assertIn(date(2024, 12, 1), analisi.mesi_parziali)
+
+    def test_il_mese_parziale_non_falsa_la_tendenza(self):
+        buste = [
+            busta(2024, 12, 228.0),
+            busta(2025, 1, 2100.0),
+            busta(2025, 2, 2110.0),
+            busta(2025, 3, 2120.0),
+            busta(2025, 4, 2130.0),
+        ]
+        pendenza, _ = analizza(buste).tendenza_netto
+        self.assertAlmostEqual(pendenza, 10.0)
+
+    def test_niente_allarme_sul_salto_dal_mese_parziale(self):
+        analisi = analizza(
+            [
+                busta(2024, 12, 228.0, 2963.0),
+                busta(2025, 1, 2140.0, 3055.0),
+                busta(2025, 2, 2267.0, 3070.0),
+                busta(2025, 3, 2192.0, 3125.0),
+            ]
+        )
+        salti = [a for a in analisi.anomalie if "aumento" in a.titolo or "calo" in a.titolo]
+        self.assertFalse(salti)
+        self.assertTrue([a for a in analisi.anomalie if "solo in parte" in a.titolo])
+
+
 class TestAndamento(unittest.TestCase):
     def test_tendenza_in_crescita(self):
         analisi = analizza(
@@ -152,9 +189,9 @@ class TestSuBusteDemo(unittest.TestCase):
     def test_serie_complete(self):
         self.assertEqual(len(self.analisi.serie("netto")), 15)
 
-    def test_mensilita_extra_escluse_dalla_serie(self):
+    def test_mesi_irregolari_esclusi_dalla_serie(self):
         self.assertLess(
-            len(self.analisi.serie("netto", escludi_extra=True)),
+            len(self.analisi.serie("netto", solo_mesi_pieni=True)),
             len(self.analisi.serie("netto")),
         )
 

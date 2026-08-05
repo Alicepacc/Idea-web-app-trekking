@@ -110,6 +110,9 @@ class Voce:
     descrizione: str
     competenza: float | None = None
     trattenuta: float | None = None
+    # il cedolino numera le voci di paga: distingue una voce vera da una
+    # riga di riepilogo
+    con_codice: bool = False
 
     @property
     def importo(self) -> float:
@@ -129,6 +132,7 @@ class BustaPaga:
     valori: dict[str, float] = field(default_factory=dict)
     voci: list[Voce] = field(default_factory=list)
     anagrafica: dict[str, str] = field(default_factory=dict)
+    formato: str = ""
     avvisi: list[str] = field(default_factory=list)
     testo: str = ""
 
@@ -143,7 +147,17 @@ class BustaPaga:
 
     @property
     def imposte(self) -> float | None:
-        """IRPEF netta + addizionali - trattamento integrativo."""
+        """Tutto quello che viene trattenuto oltre ai contributi.
+
+        Quando si conoscono il totale trattenute e i contributi, la differenza
+        e' esatta e quadra sempre col netto. Le singole voci d'imposta si
+        prestano invece a doppi conteggi (rate, conguagli, importi da
+        rateizzare), quindi si usano solo se non c'e' il totale.
+        """
+        trattenute = self.get("totale_trattenute")
+        contributi = self.get("contributi_inps")
+        if trattenute is not None and contributi is not None:
+            return round(trattenute - contributi, 2)
         pezzi = [
             self.get("irpef_netta"),
             self.get("addizionale_regionale"),

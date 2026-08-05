@@ -108,6 +108,30 @@ class TestEstrazioneSenzaColonne(unittest.TestCase):
         self.assertEqual(busta.get("netto"), 1750.00)
 
 
+# Riga di voce numerata il cui importo NON sta in una colonna importi,
+# seguita da un blocco di riepilogo: il numero del riepilogo non deve essere
+# scambiato per il valore della voce.
+VOCE_SEGUITA_DA_RIEPILOGO = """\
+  PERIODO DI RETRIBUZIONE: DICEMBRE 2024
+       VOCE   DESCRIZIONE          VALORE UNITARIO  TRATTENUTE COMPETENZE
+       8310 ADD.REG.: IMP.TO DA RATEIZZARE 3,35
+  SOCIALI I.N.P.S.
+  IMPONIBILE 280,00
+  TRATTENUTE  26,57                                    26,57
+"""
+
+
+class TestRighePericolose(unittest.TestCase):
+    def test_non_ruba_il_numero_al_blocco_sotto(self):
+        busta = busta_da_testo(VOCE_SEGUITA_DA_RIEPILOGO, "dicembre.pdf")
+        self.assertIsNone(busta.get("addizionale_regionale"))
+
+    def test_il_codice_voce_non_e_un_importo(self):
+        busta = busta_da_testo(VOCE_SEGUITA_DA_RIEPILOGO, "dicembre.pdf")
+        for valore in busta.valori.values():
+            self.assertNotEqual(valore, 8310.0)
+
+
 class TestControlli(unittest.TestCase):
     def test_avvisa_se_i_conti_non_tornano(self):
         busta = busta_da_testo(

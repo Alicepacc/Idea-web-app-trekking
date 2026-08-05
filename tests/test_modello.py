@@ -71,6 +71,20 @@ class TestGrandezzeDerivate(unittest.TestCase):
         )
         self.assertAlmostEqual(busta.aliquota_effettiva, 30.0)
 
+    def test_imposte_come_differenza_esatta(self):
+        """Col totale trattenute la differenza quadra sempre: si usa quella."""
+        busta = BustaPaga(
+            file="x.pdf",
+            valori={
+                "totale_competenze": 3000.0,
+                "totale_trattenute": 900.0,
+                "contributi_inps": 280.0,
+                "irpef_netta": 500.0,
+                "addizionale_regionale": 9999.0,  # valore letto male
+            },
+        )
+        self.assertAlmostEqual(busta.imposte, 620.0)
+
     def test_trattamento_integrativo_riduce_le_imposte(self):
         busta = BustaPaga(
             file="x.pdf",

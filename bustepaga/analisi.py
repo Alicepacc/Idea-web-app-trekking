@@ -15,6 +15,7 @@ from .pattern import (
 )
 
 SOGLIA_ANOMALIA = 10.0  # variazione percentuale oltre la quale segnalare
+SCARTO_ALIQUOTA = 8.0  # punti di prelievo di scarto dalla mediana prima di segnalare
 
 
 @dataclass
@@ -116,20 +117,31 @@ class Analisi:
     anomalie: list[Anomalia]
     anni: dict[int, dict[str, float]]
     mensilita_aggiuntive: set[date]
+    mesi_parziali: set[date]
     soglia: float = SOGLIA_ANOMALIA
 
     # --- viste comode per i report ------------------------------------------
 
-    def serie(self, chiave: str, escludi_extra: bool = False) -> list[tuple[date, float]]:
+    def serie(self, chiave: str, solo_mesi_pieni: bool = False) -> list[tuple[date, float]]:
+        """I valori di una voce nel tempo.
+
+        `solo_mesi_pieni` toglie le mensilita' aggiuntive e i mesi incompleti
+        (assunzione, cessazione, aspettativa): servono a leggere la tendenza,
+        che altrimenti verrebbe dettata da quei due o tre mesi anomali.
+        """
         punti = []
         for busta in self.buste:
             valore = busta.get(chiave)
             if busta.periodo is None or valore is None:
                 continue
-            if escludi_extra and busta.periodo in self.mensilita_aggiuntive:
+            if solo_mesi_pieni and busta.periodo in self.mesi_irregolari:
                 continue
             punti.append((busta.periodo, valore))
         return punti
+
+    @property
+    def mesi_irregolari(self) -> set[date]:
+        return self.mensilita_aggiuntive | self.mesi_parziali
 
     def serie_aliquota(self) -> list[tuple[date, float]]:
         return [
@@ -165,8 +177,8 @@ class Analisi:
 
     @property
     def tendenza_netto(self) -> tuple[float, float] | None:
-        """(euro al mese, variazione % totale) sul netto, senza mensilità extra."""
-        punti = self.serie("netto", escludi_extra=True)
+        """(euro al mese, variazione % totale) sul netto, solo mesi pieni."""
+        punti = self.serie("netto", solo_mesi_pieni=True)
         if len(punti) < 3:
             return None
         x = list(range(len(punti)))
@@ -192,6 +204,7 @@ def _pendenza(x: list[float], y: list[float]) -> float:
 def analizza(buste: list[BustaPaga], soglia: float = SOGLIA_ANOMALIA) -> Analisi:
     buste = [b for b in buste if b.valori or b.periodo]
     extra = _mensilita_aggiuntive(buste)
+    parziali = _mesi_parziali(buste)
     confronti = _confronti(buste)
     statistiche = _statistiche(buste)
     analisi = Analisi(
@@ -201,6 +214,7 @@ def analizza(buste: list[BustaPaga], soglia: float = SOGLIA_ANOMALIA) -> Analisi
         anomalie=[],
         anni=_totali_per_anno(buste),
         mensilita_aggiuntive=extra,
+        mesi_parziali=parziali,
         soglia=soglia,
     )
     analisi.anomalie = _anomalie(analisi)
@@ -208,6 +222,7 @@ def analizza(buste: list[BustaPaga], soglia: float = SOGLIA_ANOMALIA) -> Analisi
 
 
 def _confronti(buste: list[BustaPaga]) -> list[Confronto]:
+    prima_di, dopo_di = _voci_intorno(buste)
     confronti: list[Confronto] = []
     for indice, busta in enumerate(buste):
         precedente = buste[indice - 1] if indice else None
@@ -226,7 +241,7 @@ def _confronti(buste: list[BustaPaga]) -> list[Confronto]:
                     corrente=valore_corrente,
                 )
             )
-        nuove, sparite = _differenza_voci(precedente, busta)
+        nuove, sparite = _differenza_voci(buste, indice, prima_di, dopo_di)
         confronti.append(
             Confronto(
                 corrente=busta,
@@ -239,14 +254,43 @@ def _confronti(buste: list[BustaPaga]) -> list[Confronto]:
     return confronti
 
 
+def _voci_intorno(
+    buste: list[BustaPaga],
+) -> tuple[list[set[str]], list[set[str]]]:
+    """Per ogni busta: le voci gia' viste prima e quelle che torneranno dopo."""
+    descrizioni = [{v.descrizione for v in b.voci} for b in buste]
+    prima_di: list[set[str]] = []
+    accumulate: set[str] = set()
+    for voci in descrizioni:
+        prima_di.append(set(accumulate))
+        accumulate |= voci
+    dopo_di: list[set[str]] = [set() for _ in buste]
+    accumulate = set()
+    for indice in range(len(buste) - 1, -1, -1):
+        dopo_di[indice] = set(accumulate)
+        accumulate |= descrizioni[indice]
+    return prima_di, dopo_di
+
+
 def _differenza_voci(
-    precedente: BustaPaga | None, corrente: BustaPaga
+    buste: list[BustaPaga],
+    indice: int,
+    prima_di: list[set[str]],
+    dopo_di: list[set[str]],
 ) -> tuple[list[str], list[str]]:
-    if precedente is None or not precedente.voci or not corrente.voci:
+    """Voci mai viste prima, e voci che da qui in poi non tornano piu'.
+
+    Segnalare tutto quello che cambia da un mese all'altro sommergerebbe di
+    rumore: straordinari, indennita' e rimborsi vanno e vengono per natura.
+    Sono notizie solo la prima comparsa e la sparizione definitiva.
+    """
+    if indice == 0 or not buste[indice].voci or not buste[indice - 1].voci:
         return [], []
-    prima = {v.descrizione for v in precedente.voci}
-    dopo = {v.descrizione for v in corrente.voci}
-    return sorted(dopo - prima), sorted(prima - dopo)
+    correnti = {v.descrizione for v in buste[indice].voci}
+    precedenti = {v.descrizione for v in buste[indice - 1].voci}
+    nuove = correnti - prima_di[indice]
+    sparite = precedenti - correnti - dopo_di[indice]
+    return sorted(nuove), sorted(sparite)
 
 
 def _statistiche(buste: list[BustaPaga]) -> dict[str, Statistica]:
@@ -295,6 +339,29 @@ def _mensilita_aggiuntive(buste: list[BustaPaga]) -> set[date]:
     return extra
 
 
+def _plurale(quante: int, singolare: str, plurale: str) -> str:
+    return f"{quante} {singolare if quante == 1 else plurale}"
+
+
+def _mesi_parziali(buste: list[BustaPaga]) -> set[date]:
+    """Mesi lavorati solo in parte: il netto crolla senza che sia cambiato nulla.
+
+    Si riconoscono dal netto molto sotto la mediana; e' il caso del mese di
+    assunzione o di cessazione, e delle assenze non retribuite.
+    """
+    netti = [b.get("netto") for b in buste if b.get("netto") is not None]
+    if len(netti) < 3:
+        return set()
+    mediana = statistics.median(netti)
+    return {
+        b.periodo
+        for b in buste
+        if b.periodo is not None
+        and b.get("netto") is not None
+        and b.get("netto") < mediana * 0.6
+    }
+
+
 def _anomalie(analisi: Analisi) -> list[Anomalia]:
     anomalie: list[Anomalia] = []
 
@@ -313,8 +380,9 @@ def _anomalie(analisi: Analisi) -> list[Anomalia]:
         if confronto.precedente is None:
             continue
         periodo = confronto.corrente.periodo
-        extra = periodo in analisi.mensilita_aggiuntive or (
-            confronto.precedente.periodo in analisi.mensilita_aggiuntive
+        irregolare = (
+            periodo in analisi.mesi_irregolari
+            or confronto.precedente.periodo in analisi.mesi_irregolari
         )
         for variazione in confronto.variazioni:
             if variazione.chiave not in ("netto", "totale_competenze"):
@@ -322,8 +390,8 @@ def _anomalie(analisi: Analisi) -> list[Anomalia]:
             delta_pct = variazione.delta_pct
             if delta_pct is None or abs(delta_pct) < analisi.soglia:
                 continue
-            if extra:
-                continue  # tredicesima/quattordicesima: lo scarto e' atteso
+            if irregolare:
+                continue  # mensilita' extra o mese parziale: lo scarto e' atteso
             verso = "in aumento" if delta_pct > 0 else "in calo"
             anomalie.append(
                 Anomalia(
@@ -337,20 +405,20 @@ def _anomalie(analisi: Analisi) -> list[Anomalia]:
                     ),
                 )
             )
-        for voce in confronto.voci_nuove:
+        if confronto.voci_nuove:
             anomalie.append(
                 Anomalia(
                     periodo=periodo,
-                    titolo="Voce comparsa",
-                    dettaglio=f"«{voce}» non c'era il mese prima",
+                    titolo=_plurale(len(confronto.voci_nuove), "voce mai vista prima", "voci mai viste prima"),
+                    dettaglio=", ".join(confronto.voci_nuove),
                 )
             )
-        for voce in confronto.voci_sparite:
+        if confronto.voci_sparite:
             anomalie.append(
                 Anomalia(
                     periodo=periodo,
-                    titolo="Voce sparita",
-                    dettaglio=f"«{voce}» c'era il mese prima e ora non compare",
+                    titolo=_plurale(len(confronto.voci_sparite), "voce non compare piu'", "voci non compaiono piu'"),
+                    dettaglio=", ".join(confronto.voci_sparite),
                 )
             )
 
@@ -369,18 +437,34 @@ def _anomalie(analisi: Analisi) -> list[Anomalia]:
                     )
                 )
 
+    for periodo in sorted(analisi.mesi_parziali):
+        anomalie.append(
+            Anomalia(
+                periodo=periodo,
+                titolo="Mese lavorato solo in parte",
+                dettaglio=(
+                    "il netto e' molto sotto la media: assunzione, cessazione "
+                    "o assenze non retribuite. Escluso dal calcolo della tendenza."
+                ),
+            )
+        )
+
     aliquote = [a for _, a in analisi.serie_aliquota()]
     if len(aliquote) >= 3:
         mediana = statistics.median(aliquote)
         for periodo, aliquota in analisi.serie_aliquota():
-            if abs(aliquota - mediana) > 3.0:
+            # I mesi irregolari hanno gia' la loro segnalazione, e un'aliquota
+            # diversa e' proprio quello che ci si aspetta.
+            if periodo in analisi.mesi_irregolari:
+                continue
+            if abs(aliquota - mediana) > SCARTO_ALIQUOTA:
                 anomalie.append(
                     Anomalia(
                         periodo=periodo,
                         titolo=f"Prelievo fuori linea: {formatta_pct(aliquota)}",
                         dettaglio=(
-                            f"la mediana del periodo e' {formatta_pct(mediana)}; "
-                            "conguagli e mensilità extra spostano l'aliquota"
+                            f"la mediana del periodo e' {formatta_pct(mediana)}: "
+                            "di solito dipende da un conguaglio fiscale"
                         ),
                     )
                 )

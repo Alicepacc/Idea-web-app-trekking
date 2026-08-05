@@ -94,6 +94,12 @@ CAMPI: tuple[Campo, ...] = (
     ),
     # ----------------------------------------------------------- retribuzione
     Campo(
+        "retribuzione_teorica",
+        "Retribuzione teorica mensile",
+        "retribuzione",
+        (r"RETRIBUZIONE\s+TEORICA(?:\s+MENSILE)?", r"RETRIBUZIONE\s+DI\s+FATTO"),
+    ),
+    Campo(
         "paga_base",
         "Paga base / minimo",
         "retribuzione",
@@ -114,13 +120,14 @@ CAMPI: tuple[Campo, ...] = (
         "superminimo",
         "Superminimo",
         "retribuzione",
-        (r"SUPER\s?MINIMO", r"AD\s+PERSONAM"),
+        (r"SUPER\s?MINIMO", r"SUPERM\.?\s?INDIV", r"AD\s+PERSONAM"),
     ),
     Campo(
         "scatti_anzianita",
         "Scatti di anzianità",
         "retribuzione",
         (r"SCATTI\s+(?:DI\s+)?ANZIANITA", r"\bSCATTI\b"),
+        esclusioni=(r"PROSSIMO\s+SCATTO", r"N\.?\s?SCATTI", r"DATA\s+SCATTO"),
     ),
     Campo(
         "edr",
@@ -257,14 +264,22 @@ CAMPI: tuple[Campo, ...] = (
         "addizionale_regionale",
         "Addizionale regionale",
         "fisco",
-        (r"ADD(?:IZIONALE|\.?LE|\.)?\s+REGIONALE", r"\bA\.?\s?REG(?:IONALE)?\b"),
+        (
+            r"ADD(?:IZIONALE|\.?LE|\.)?\s+REGIONALE",
+            r"\bADD\.?\s?REG\b",
+            r"\bA\.?\s?REG(?:IONALE)?\b",
+        ),
         somma=True,
     ),
     Campo(
         "addizionale_comunale",
         "Addizionale comunale",
         "fisco",
-        (r"ADD(?:IZIONALE|\.?LE|\.)?\s+COMUNALE", r"\bA\.?\s?COM(?:UNALE)?\b"),
+        (
+            r"ADD(?:IZIONALE|\.?LE|\.)?\s+COMUNALE",
+            r"\bADD\.?\s?COM\b",
+            r"\bA\.?\s?COM(?:UNALE)?\b",
+        ),
         somma=True,
     ),
     Campo(
@@ -292,7 +307,7 @@ CAMPI: tuple[Campo, ...] = (
     ),
     Campo(
         "tfr_totale",
-        "TFR accantonato (totale)",
+        "TFR accantonato (progressivo)",
         "tfr",
         (
             r"TFR\s+NETTO(?:\s+ACCANTONATO)?",
@@ -343,6 +358,20 @@ CAMPI: tuple[Campo, ...] = (
         posizione="ultimo",
     ),
     Campo(
+        "permessi_maturati",
+        "Permessi maturati",
+        "assenze",
+        (r"(?:PERMESSI|ROL)\s+MATURAT[IO]",),
+        unita=ORE,
+    ),
+    Campo(
+        "permessi_goduti",
+        "Permessi goduti",
+        "assenze",
+        (r"(?:PERMESSI|ROL)\s+(?:GODUT[IO]|FRUIT[IO])",),
+        unita=ORE,
+    ),
+    Campo(
         "ex_festivita_residue",
         "Ex festività residue",
         "assenze",
@@ -382,7 +411,8 @@ CAMPI: tuple[Campo, ...] = (
 _IN_COMPETENZE = {
     "totale_competenze", "netto", "arrotondamento", "paga_base", "contingenza",
     "superminimo", "scatti_anzianita", "edr", "straordinari", "indennita", "premi",
-    "rimborsi", "buoni_pasto", "tredicesima", "quattordicesima", "trattamento_integrativo",
+    "retribuzione_teorica",
+    "rimborsi", "tredicesima", "quattordicesima", "trattamento_integrativo",
 }
 _IN_TRATTENUTE = {
     "totale_trattenute", "contributi_inps", "fondo_pensione", "irpef_netta",
