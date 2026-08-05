@@ -1,0 +1,18 @@
+# ---------------------------------------------------------------------------
+# DATI PERSONALI — non devono MAI finire su git
+# ---------------------------------------------------------------------------
+buste/*
+!buste/.gitkeep
+*.pdf
+output/
+report*.html
+dati_buste.csv
+dati_buste.json
+testo_estratto/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/

@@ -1,0 +1,5 @@
+# Estrazione del testo dai PDF.
+# pdfplumber e' il motore principale (mantiene la disposizione delle colonne),
+# pypdf e' il ripiego se pdfplumber non e' installabile.
+pdfplumber>=0.11
+pypdf>=4.0
