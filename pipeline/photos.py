@@ -151,10 +151,14 @@ def licences(files):
     their URL comes from the file name (Commons stores files by MD5 prefix).
     """
     names = sorted({f.replace(" ", "_") for f in files if re.search(r"\.(jpe?g|png)$", f, re.I)})
-    found = {}
-    for i in range(0, len(names), 50):
+    cache = WORK / "photo_licences.json"  # kept between runs: licences do not change
+    found = {k: tuple(v) for k, v in json.loads(cache.read_text()).items()} if cache.exists() else {}
+    save = lambda: cache.write_text(json.dumps(found, ensure_ascii=False))
+    todo = [n for n in names if not found.get(n, ("", ""))[0]]
+    for i in range(0, len(todo), 50):
         try:
-            found.update(api_meta(names[i:i + 50]))
+            found.update(api_meta(todo[i:i + 50]))
+            save()
         except urllib.error.HTTPError:
             pass
         time.sleep(5)
@@ -163,6 +167,7 @@ def licences(files):
             continue
         try:
             found[n] = page_meta(n)
+            save()
         except urllib.error.HTTPError:
             continue
         time.sleep(3)
@@ -182,17 +187,18 @@ def licences(files):
 
 
 def thumbnail(meta):
+    """A small WebP of the picture, or None when Wikimedia does not deliver it now."""
     data = None
     # pictures narrower than a thumbnail size have no thumbnail at that size: try smaller ones,
     # and the original (the most rate-limited request) only as a last resort
-    for width in (960, 500, 330):
+    for url in [meta["thumb"].replace("/960px-", f"/{w}px-") for w in (960, 500, 330, 250)] + [meta["original"]]:
         try:
-            data = get(meta["thumb"].replace("/960px-", f"/{width}px-"), attempts=2)
+            data = get(url, attempts=2)
             break
-        except urllib.error.HTTPError:
+        except (urllib.error.HTTPError, OSError):
             continue
     if data is None:
-        data = get(meta["original"])
+        return None
     img = Image.open(io.BytesIO(data)).convert("RGB")
     if img.width > OUT_W:
         img = img.resize((OUT_W, round(img.height * OUT_W / img.width)), Image.LANCZOS)
@@ -222,6 +228,8 @@ def main():
         thumbs = list(ex.map(lambda t: thumbnail(meta[t[1]]), todo))
     index, pack, buf = {}, 0, bytearray()
     for (poi, f), data in zip(todo, thumbs):
+        if data is None:
+            continue
         if len(buf) + len(data) > PACK_BYTES:
             (OUT / f"photos-{pack}.webp").write_bytes(buf)
             pack, buf = pack + 1, bytearray()
