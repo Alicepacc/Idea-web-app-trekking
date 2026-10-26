@@ -1,0 +1,749 @@
+<title>Sentieri d'autunno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: a guidebook column on the left, the map takes the rest of the screen; on phones the map sits on top. */
+:root {
+  --paper: #eef1ec;
+  --panel: #f8f9f6;
+  --ink: #1b2824;
+  --ink-2: #52605b;
+  --rule: #d6ddd7;
+  --chip: #e6ebe5;
+  --larch: #c07311;
+  --larch-soft: #f4e2c0;
+  --trail: #c4162a;
+  --lake: #286f98;
+  --sky: #5566ad;
+  --hut: #7d5133;
+  --warn: #9a5b00;
+  --warn-soft: #fbecd2;
+  --focus: #1f6feb;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Barlow", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111715; --panel: #161e1b; --ink: #e2e9e5; --ink-2: #a3b0aa; --rule: #2b3732; --chip: #212b27;
+    --larch: #e8a43c; --larch-soft: #3a2d18; --trail: #ef5b69; --lake: #73b6dc; --sky: #9eabea; --hut: #d4a37c;
+    --warn: #f0b356; --warn-soft: #3a2a12; --focus: #79a8ff; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111715; --panel: #161e1b; --ink: #e2e9e5; --ink-2: #a3b0aa; --rule: #2b3732; --chip: #212b27;
+  --larch: #e8a43c; --larch-soft: #3a2d18; --trail: #ef5b69; --lake: #73b6dc; --sky: #9eabea; --hut: #d4a37c;
+  --warn: #f0b356; --warn-soft: #3a2a12; --focus: #79a8ff; color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.45 var(--font-body); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.app { display: grid; grid-template-columns: minmax(340px, 430px) 1fr; height: 100%; }
+.panel { overflow-y: auto; background: var(--panel); border-right: 1px solid var(--rule);
+  padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: 20px; padding-block: 18px 28px;
+  display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.mapwrap { position: relative; min-width: 0; background: var(--paper); }
+#map { position: absolute; inset: 0; }
+
+/* Brand */
+.brand { display: grid; gap: 4px; }
+.brand h1 { margin: 0; font: 700 30px/1 var(--font-display); letter-spacing: .01em; text-wrap: balance; }
+.brand h1 span { color: var(--larch); }
+.brand p { margin: 0; color: var(--ink-2); font-size: 14px; }
+.fresh { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; color: var(--ink-2); }
+.fresh i { width: 8px; height: 8px; border-radius: 50%; background: var(--larch); display: inline-block; }
+
+.label { font: 600 12px/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+section { display: grid; gap: 10px; min-width: 0; }
+
+/* Presets */
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.preset { border: 1px solid var(--rule); background: transparent; border-radius: 999px; padding: 5px 12px; cursor: pointer; font-weight: 500; }
+.preset[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+
+/* Weights */
+.weights { display: grid; gap: 8px; }
+.weight { display: grid; grid-template-columns: 86px 1fr 84px; align-items: center; gap: 10px; }
+.weight label { font-weight: 600; display: flex; align-items: center; gap: 7px; }
+.weight label i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.weight output { font-size: 13px; color: var(--ink-2); text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--ink); }
+
+/* Filters */
+details.filters { border: 1px solid var(--rule); border-radius: var(--r); padding: 0 14px; }
+details.filters > summary { cursor: pointer; padding: 11px 0; list-style: none; display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+details.filters > summary::-webkit-details-marker { display: none; }
+details.filters > summary::after { content: "+"; font: 600 18px/1 var(--font-display); color: var(--ink-2); }
+details.filters[open] > summary::after { content: "–"; }
+.filter-grid { display: grid; gap: 14px; padding-bottom: 14px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.row output { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-2); }
+.diffs { display: flex; flex-wrap: wrap; gap: 6px; }
+.diffs label, .checks label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.diffs label { border: 1px solid var(--rule); border-radius: 6px; padding: 3px 8px; font-size: 13px; }
+.diffs input { accent-color: var(--ink); }
+.checks { display: grid; gap: 7px; font-size: 14px; }
+.checks input { accent-color: var(--ink); width: 16px; height: 16px; }
+.near { display: grid; grid-template-columns: 1fr 92px; gap: 8px; }
+.near input, .near select { border: 1px solid var(--rule); border-radius: 8px; background: var(--panel); padding: 7px 9px; min-width: 0; }
+.hint { font-size: 12.5px; color: var(--ink-2); margin: 0; }
+
+/* Results */
+.results-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.results-head h2 { margin: 0; font: 600 20px/1.1 var(--font-display); }
+.results-head span { font-size: 13px; color: var(--ink-2); }
+.cards { display: grid; gap: 0; border-top: 1px solid var(--rule); }
+.card { display: grid; grid-template-columns: 46px 1fr 44px; gap: 10px; align-items: start; text-align: left; width: 100%;
+  border: 0; border-bottom: 1px solid var(--rule); background: transparent; padding: 11px 2px; cursor: pointer; }
+.card:hover, .card.hot { background: color-mix(in srgb, var(--larch-soft) 45%, transparent); }
+.card-main { display: grid; gap: 3px; min-width: 0; }
+.card-title { font: 600 16.5px/1.2 var(--font-display); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-meta { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.card-why { font-size: 13px; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-score { display: grid; justify-items: end; gap: 5px; }
+.card-score b { font: 700 22px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.bars { display: grid; grid-template-columns: repeat(4, 7px); gap: 2px; align-items: end; height: 18px; }
+.bars i { display: block; border-radius: 1px; min-height: 2px; }
+.more { border: 1px solid var(--rule); background: transparent; border-radius: 8px; padding: 8px; cursor: pointer; font-weight: 600; }
+.empty { padding: 14px; border: 1px dashed var(--rule); border-radius: var(--r); color: var(--ink-2); }
+.warnchip { display: inline-block; font-size: 12px; font-weight: 600; color: var(--warn); background: var(--warn-soft); border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+
+/* Trail mark */
+.mark svg { display: block; width: 46px; height: 28px; }
+
+/* Detail */
+.detail { display: grid; gap: 16px; }
+.back { justify-self: start; border: 0; background: transparent; padding: 0; color: var(--ink-2); cursor: pointer; font-weight: 600; }
+.d-head { display: grid; grid-template-columns: 46px 1fr; gap: 12px; align-items: start; }
+.d-head h2 { margin: 0; font: 700 24px/1.08 var(--font-display); text-wrap: balance; }
+.d-head p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.stat { display: grid; gap: 2px; }
+.stat b { font: 600 19px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--ink-2); }
+.scores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.score { display: grid; gap: 5px; }
+.score span { font-size: 12px; color: var(--ink-2); }
+.score b { font: 700 20px/1 var(--font-display); }
+.meter { height: 5px; background: var(--chip); border-radius: 3px; overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 3px; }
+.profile svg { width: 100%; height: auto; display: block; }
+.profile .axis { fill: var(--ink-2); font: 11px var(--font-body); }
+.why { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.why li::marker { color: var(--larch); }
+.along { display: grid; gap: 6px; font-size: 14px; }
+.along div { display: grid; grid-template-columns: 74px 1fr; gap: 8px; }
+.along dt { color: var(--ink-2); font-size: 13px; }
+.along dd { margin: 0; }
+.caveat { font-size: 13px; color: var(--ink-2); border-left: 3px solid var(--larch); padding: 2px 0 2px 10px; margin: 0; }
+.links { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; }
+.links a { color: var(--ink); text-underline-offset: 3px; }
+
+.about { font-size: 13px; color: var(--ink-2); display: grid; gap: 8px; border-top: 1px solid var(--rule); padding-top: 14px; }
+.about p { margin: 0; }
+.about a { color: inherit; }
+
+/* Map overlays */
+.layers { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(10px + env(safe-area-inset-right, 0px));
+  background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 6px;
+  font-size: 13.5px; box-shadow: 0 2px 10px rgb(0 0 0 / .12); z-index: 2; }
+.layers label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.layers input { accent-color: var(--ink); }
+.legend { position: absolute; left: calc(10px + env(safe-area-inset-left, 0px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r); padding: 8px 10px; font-size: 12px;
+  display: grid; gap: 5px; z-index: 2; max-width: calc(100% - 20px); }
+.legend .ramp { height: 7px; width: 140px; border-radius: 3px; }
+.legend .ends { display: flex; justify-content: space-between; width: 140px; color: var(--ink-2); }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-2); z-index: 1; pointer-events: none; }
+.town { font: 600 12px/1 var(--font-display); letter-spacing: .04em; color: #1b2824; text-shadow: 0 0 3px #fff, 0 0 2px #fff; pointer-events: none; white-space: nowrap; }
+.poi { display: flex; align-items: center; gap: 4px; font: 600 12px/1 var(--font-body); color: #1b2824; text-shadow: 0 0 3px #fff, 0 0 2px #fff; white-space: nowrap; pointer-events: none; }
+.poi i { width: 9px; height: 9px; border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgb(0 0 0 / .35); display: inline-block; }
+.poi.rifugio i, .poi.malga i, .poi.bivacco i { background: #7d5133; border-radius: 2px; }
+.poi.malga i { border-radius: 50%; }
+.poi.lake i { background: #286f98; border-radius: 50%; }
+.poi.peak i { background: #1b2824; clip-path: polygon(50% 0, 100% 100%, 0 100%); border: 0; box-shadow: none; width: 11px; height: 10px; }
+.maplibregl-popup-content { background: var(--panel); color: var(--ink); font: 13px/1.3 var(--font-body); padding: 7px 10px; border-radius: 8px; }
+.maplibregl-popup-tip { border-top-color: var(--panel) !important; border-bottom-color: var(--panel) !important; }
+
+@media (max-width: 860px) {
+  html, body { height: auto; }
+  .app { display: flex; flex-direction: column; height: auto; }
+  .mapwrap { order: -1; height: 56vh; min-height: 330px; }
+  .panel { overflow: visible; border-right: 0; padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); }
+  .stats, .scores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .legend { display: none; }
+  .layers { padding: 7px 9px; gap: 4px; font-size: 12.5px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style id="maplibre-css">/* maplibre-gl 4.7.1 (BSD-3-Clause) */
+.maplibregl-map{font:12px/20px Helvetica Neue,Arial,Helvetica,sans-serif;overflow:hidden;position:relative;-webkit-tap-highlight-color:rgb(0 0 0/0)}.maplibregl-canvas{left:0;position:absolute;top:0}.maplibregl-map:fullscreen{height:100%;width:100%}.maplibregl-ctrl-group button.maplibregl-ctrl-compass{touch-action:none}.maplibregl-canvas-container.maplibregl-interactive,.maplibregl-ctrl-group button.maplibregl-ctrl-compass{cursor:grab;-webkit-user-select:none;-moz-user-select:none;user-select:none}.maplibregl-canvas-container.maplibregl-interactive.maplibregl-track-pointer{cursor:pointer}.maplibregl-canvas-container.maplibregl-interactive:active,.maplibregl-ctrl-group button.maplibregl-ctrl-compass:active{cursor:grabbing}.maplibregl-canvas-container.maplibregl-touch-zoom-rotate,.maplibregl-canvas-container.maplibregl-touch-zoom-rotate .maplibregl-canvas{touch-action:pan-x pan-y}.maplibregl-canvas-container.maplibregl-touch-drag-pan,.maplibregl-canvas-container.maplibregl-touch-drag-pan .maplibregl-canvas{touch-action:pinch-zoom}.maplibregl-canvas-container.maplibregl-touch-zoom-rotate.maplibregl-touch-drag-pan,.maplibregl-canvas-container.maplibregl-touch-zoom-rotate.maplibregl-touch-drag-pan .maplibregl-canvas{touch-action:none}.maplibregl-canvas-container.maplibregl-touch-drag-pan.maplibregl-cooperative-gestures,.maplibregl-canvas-container.maplibregl-touch-drag-pan.maplibregl-cooperative-gestures .maplibregl-canvas{touch-action:pan-x pan-y}.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right,.maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right{pointer-events:none;position:absolute;z-index:2}.maplibregl-ctrl-top-left{left:0;top:0}.maplibregl-ctrl-top-right{right:0;top:0}.maplibregl-ctrl-bottom-left{bottom:0;left:0}.maplibregl-ctrl-bottom-right{bottom:0;right:0}.maplibregl-ctrl{clear:both;pointer-events:auto;transform:translate(0)}.maplibregl-ctrl-top-left .maplibregl-ctrl{float:left;margin:10px 0 0 10px}.maplibregl-ctrl-top-right .maplibregl-ctrl{float:right;margin:10px 10px 0 0}.maplibregl-ctrl-bottom-left .maplibregl-ctrl{float:left;margin:0 0 10px 10px}.maplibregl-ctrl-bottom-right .maplibregl-ctrl{float:right;margin:0 10px 10px 0}.maplibregl-ctrl-group{background:#fff;border-radius:4px}.maplibregl-ctrl-group:not(:empty){box-shadow:0 0 0 2px rgba(0,0,0,.1)}@media (forced-colors:active){.maplibregl-ctrl-group:not(:empty){box-shadow:0 0 0 2px ButtonText}}.maplibregl-ctrl-group button{background-color:transparent;border:0;box-sizing:border-box;cursor:pointer;display:block;height:29px;outline:none;padding:0;width:29px}.maplibregl-ctrl-group button+button{border-top:1px solid #ddd}.maplibregl-ctrl button .maplibregl-ctrl-icon{background-position:50%;background-repeat:no-repeat;display:block;height:100%;width:100%}@media (forced-colors:active){.maplibregl-ctrl-icon{background-color:transparent}.maplibregl-ctrl-group button+button{border-top:1px solid ButtonText}}.maplibregl-ctrl button::-moz-focus-inner{border:0;padding:0}.maplibregl-ctrl-attrib-button:focus,.maplibregl-ctrl-group button:focus{box-shadow:0 0 2px 2px #0096ff}.maplibregl-ctrl button:disabled{cursor:not-allowed}.maplibregl-ctrl button:disabled .maplibregl-ctrl-icon{opacity:.25}.maplibregl-ctrl button:not(:disabled):hover{background-color:rgb(0 0 0/5%)}.maplibregl-ctrl-group button:focus:focus-visible{box-shadow:0 0 2px 2px #0096ff}.maplibregl-ctrl-group button:focus:not(:focus-visible){box-shadow:none}.maplibregl-ctrl-group button:focus:first-child{border-radius:4px 4px 0 0}.maplibregl-ctrl-group button:focus:last-child{border-radius:0 0 4px 4px}.maplibregl-ctrl-group button:focus:only-child{border-radius:inherit}.maplibregl-ctrl button.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23333' viewBox='0 0 29 29'%3E%3Cpath d='M10 13c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h9c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23333' viewBox='0 0 29 29'%3E%3Cpath d='M14.5 8.5c-.75 0-1.5.75-1.5 1.5v3h-3c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h3v3c0 .75.75 1.5 1.5 1.5S16 19.75 16 19v-3h3c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13h-3v-3c0-.75-.75-1.5-1.5-1.5'/%3E%3C/svg%3E")}@media (forced-colors:active){.maplibregl-ctrl button.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 29 29'%3E%3Cpath d='M10 13c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h9c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 29 29'%3E%3Cpath d='M14.5 8.5c-.75 0-1.5.75-1.5 1.5v3h-3c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h3v3c0 .75.75 1.5 1.5 1.5S16 19.75 16 19v-3h3c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13h-3v-3c0-.75-.75-1.5-1.5-1.5'/%3E%3C/svg%3E")}}@media (forced-colors:active) and (prefers-color-scheme:light){.maplibregl-ctrl button.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='M10 13c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h9c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='M14.5 8.5c-.75 0-1.5.75-1.5 1.5v3h-3c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h3v3c0 .75.75 1.5 1.5 1.5S16 19.75 16 19v-3h3c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13h-3v-3c0-.75-.75-1.5-1.5-1.5'/%3E%3C/svg%3E")}}.maplibregl-ctrl button.maplibregl-ctrl-fullscreen .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23333' viewBox='0 0 29 29'%3E%3Cpath d='M24 16v5.5c0 1.75-.75 2.5-2.5 2.5H16v-1l3-1.5-4-5.5 1-1 5.5 4 1.5-3zM6 16l1.5 3 5.5-4 1 1-4 5.5 3 1.5v1H7.5C5.75 24 5 23.25 5 21.5V16zm7-11v1l-3 1.5 4 5.5-1 1-5.5-4L6 13H5V7.5C5 5.75 5.75 5 7.5 5zm11 2.5c0-1.75-.75-2.5-2.5-2.5H16v1l3 1.5-4 5.5 1 1 5.5-4 1.5 3h1z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-shrink .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='M18.5 16c-1.75 0-2.5.75-2.5 2.5V24h1l1.5-3 5.5 4 1-1-4-5.5 3-1.5v-1zM13 18.5c0-1.75-.75-2.5-2.5-2.5H5v1l3 1.5L4 24l1 1 5.5-4 1.5 3h1zm3-8c0 1.75.75 2.5 2.5 2.5H24v-1l-3-1.5L25 5l-1-1-5.5 4L17 5h-1zM10.5 13c1.75 0 2.5-.75 2.5-2.5V5h-1l-1.5 3L5 4 4 5l4 5.5L5 12v1z'/%3E%3C/svg%3E")}@media (forced-colors:active){.maplibregl-ctrl button.maplibregl-ctrl-fullscreen .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 29 29'%3E%3Cpath d='M24 16v5.5c0 1.75-.75 2.5-2.5 2.5H16v-1l3-1.5-4-5.5 1-1 5.5 4 1.5-3zM6 16l1.5 3 5.5-4 1 1-4 5.5 3 1.5v1H7.5C5.75 24 5 23.25 5 21.5V16zm7-11v1l-3 1.5 4 5.5-1 1-5.5-4L6 13H5V7.5C5 5.75 5.75 5 7.5 5zm11 2.5c0-1.75-.75-2.5-2.5-2.5H16v1l3 1.5-4 5.5 1 1 5.5-4 1.5 3h1z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-shrink .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 29 29'%3E%3Cpath d='M18.5 16c-1.75 0-2.5.75-2.5 2.5V24h1l1.5-3 5.5 4 1-1-4-5.5 3-1.5v-1zM13 18.5c0-1.75-.75-2.5-2.5-2.5H5v1l3 1.5L4 24l1 1 5.5-4 1.5 3h1zm3-8c0 1.75.75 2.5 2.5 2.5H24v-1l-3-1.5L25 5l-1-1-5.5 4L17 5h-1zM10.5 13c1.75 0 2.5-.75 2.5-2.5V5h-1l-1.5 3L5 4 4 5l4 5.5L5 12v1z'/%3E%3C/svg%3E")}}@media (forced-colors:active) and (prefers-color-scheme:light){.maplibregl-ctrl button.maplibregl-ctrl-fullscreen .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='M24 16v5.5c0 1.75-.75 2.5-2.5 2.5H16v-1l3-1.5-4-5.5 1-1 5.5 4 1.5-3zM6 16l1.5 3 5.5-4 1 1-4 5.5 3 1.5v1H7.5C5.75 24 5 23.25 5 21.5V16zm7-11v1l-3 1.5 4 5.5-1 1-5.5-4L6 13H5V7.5C5 5.75 5.75 5 7.5 5zm11 2.5c0-1.75-.75-2.5-2.5-2.5H16v1l3 1.5-4 5.5 1 1 5.5-4 1.5 3h1z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-shrink .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='M18.5 16c-1.75 0-2.5.75-2.5 2.5V24h1l1.5-3 5.5 4 1-1-4-5.5 3-1.5v-1zM13 18.5c0-1.75-.75-2.5-2.5-2.5H5v1l3 1.5L4 24l1 1 5.5-4 1.5 3h1zm3-8c0 1.75.75 2.5 2.5 2.5H24v-1l-3-1.5L25 5l-1-1-5.5 4L17 5h-1zM10.5 13c1.75 0 2.5-.75 2.5-2.5V5h-1l-1.5 3L5 4 4 5l4 5.5L5 12v1z'/%3E%3C/svg%3E")}}.maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23333' viewBox='0 0 29 29'%3E%3Cpath d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23ccc' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E")}@media (forced-colors:active){.maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 29 29'%3E%3Cpath d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23ccc' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E")}}@media (forced-colors:active) and (prefers-color-scheme:light){.maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23ccc' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E")}}.maplibregl-ctrl button.maplibregl-ctrl-terrain .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' fill='%23333' viewBox='0 0 22 22'%3E%3Cpath d='m1.754 13.406 4.453-4.851 3.09 3.09 3.281 3.277.969-.969-3.309-3.312 3.844-4.121 6.148 6.886h1.082v-.855l-7.207-8.07-4.84 5.187L6.169 6.57l-5.48 5.965v.871ZM.688 16.844h20.625v1.375H.688Zm0 0'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-terrain-enabled .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' fill='%2333b5e5' viewBox='0 0 22 22'%3E%3Cpath d='m1.754 13.406 4.453-4.851 3.09 3.09 3.281 3.277.969-.969-3.309-3.312 3.844-4.121 6.148 6.886h1.082v-.855l-7.207-8.07-4.84 5.187L6.169 6.57l-5.48 5.965v.871ZM.688 16.844h20.625v1.375H.688Zm0 0'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23333' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate:disabled .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23aaa' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3Cpath fill='red' d='m14 5 1 1-9 9-1-1z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-active .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%2333b5e5' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-active-error .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23e58978' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-background .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%2333b5e5' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-background-error .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23e54e33' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-waiting .maplibregl-ctrl-icon{animation:maplibregl-spin 2s linear infinite}@media (forced-colors:active){.maplibregl-ctrl button.maplibregl-ctrl-geolocate .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate:disabled .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23999' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3Cpath fill='red' d='m14 5 1 1-9 9-1-1z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-active .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%2333b5e5' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-active-error .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23e58978' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-background .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%2333b5e5' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-background-error .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23e54e33' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3C/svg%3E")}}@media (forced-colors:active) and (prefers-color-scheme:light){.maplibregl-ctrl button.maplibregl-ctrl-geolocate .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate:disabled .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23666' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3Cpath fill='red' d='m14 5 1 1-9 9-1-1z'/%3E%3C/svg%3E")}}@keyframes maplibregl-spin{0%{transform:rotate(0deg)}to{transform:rotate(1turn)}}a.maplibregl-ctrl-logo{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='23' fill='none'%3E%3Cpath fill='%23000' fill-opacity='.4' fill-rule='evenodd' d='M17.408 16.796h-1.827l2.501-12.095h.198l3.324 6.533.988 2.19.988-2.19 3.258-6.533h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.929 5.644h-.098l-2.914-5.644-.757-1.71-.345 1.71zm1.958-3.42-.726 3.663a1.255 1.255 0 0 1-1.232 1.011h-1.827a1.255 1.255 0 0 1-1.229-1.509l2.501-12.095a1.255 1.255 0 0 1 1.23-1.001h.197a1.25 1.25 0 0 1 1.12.685l3.19 6.273 3.125-6.263a1.25 1.25 0 0 1 1.123-.695h.181a1.255 1.255 0 0 1 1.227.991l1.443 6.71a5 5 0 0 1 .314-.787l.009-.016a4.6 4.6 0 0 1 1.777-1.887c.782-.46 1.668-.667 2.611-.667a4.6 4.6 0 0 1 1.7.32l.306.134c.21-.16.474-.256.759-.256h1.694a1.255 1.255 0 0 1 1.212.925 1.255 1.255 0 0 1 1.212-.925h1.711c.284 0 .545.094.755.252.613-.3 1.312-.45 2.075-.45 1.356 0 2.557.445 3.482 1.4q.47.48.763 1.064V4.701a1.255 1.255 0 0 1 1.255-1.255h1.86A1.255 1.255 0 0 1 54.44 4.7v9.194h2.217c.19 0 .37.043.532.118v-4.77c0-.356.147-.678.385-.906a2.42 2.42 0 0 1-.682-1.71c0-.665.267-1.253.735-1.7a2.45 2.45 0 0 1 1.722-.674 2.43 2.43 0 0 1 1.705.675q.318.302.504.683V4.7a1.255 1.255 0 0 1 1.255-1.255h1.744A1.255 1.255 0 0 1 65.812 4.7v3.335a4.8 4.8 0 0 1 1.526-.246c.938 0 1.817.214 2.59.69a4.47 4.47 0 0 1 1.67 1.743v-.98a1.255 1.255 0 0 1 1.256-1.256h1.777c.233 0 .451.064.639.174a3.4 3.4 0 0 1 1.567-.372c.346 0 .861.02 1.285.232a1.25 1.25 0 0 1 .689 1.004 4.7 4.7 0 0 1 .853-.588c.795-.44 1.675-.647 2.61-.647 1.385 0 2.65.39 3.525 1.396.836.938 1.168 2.173 1.168 3.528q-.001.515-.056 1.051a1.255 1.255 0 0 1-.947 1.09l.408.952a1.255 1.255 0 0 1-.477 1.552c-.418.268-.92.463-1.458.612-.613.171-1.304.244-2.049.244-1.06 0-2.043-.207-2.886-.698l-.015-.008c-.798-.48-1.419-1.135-1.818-1.963l-.004-.008a5.8 5.8 0 0 1-.548-2.512q0-.429.053-.843a1.3 1.3 0 0 1-.333-.086l-.166-.004c-.223 0-.426.062-.643.228-.03.024-.142.139-.142.59v3.883a1.255 1.255 0 0 1-1.256 1.256h-1.777a1.255 1.255 0 0 1-1.256-1.256V15.69l-.032.057a4.8 4.8 0 0 1-1.86 1.833 5.04 5.04 0 0 1-2.484.634 4.5 4.5 0 0 1-1.935-.424 1.25 1.25 0 0 1-.764.258h-1.71a1.255 1.255 0 0 1-1.256-1.255V7.687a2.4 2.4 0 0 1-.428.625c.253.23.412.561.412.93v7.553a1.255 1.255 0 0 1-1.256 1.255h-1.843a1.25 1.25 0 0 1-.894-.373c-.228.23-.544.373-.894.373H51.32a1.255 1.255 0 0 1-1.256-1.255v-1.251l-.061.117a4.7 4.7 0 0 1-1.782 1.884 4.77 4.77 0 0 1-2.485.67 5.6 5.6 0 0 1-1.485-.188l.009 2.764a1.255 1.255 0 0 1-1.255 1.259h-1.729a1.255 1.255 0 0 1-1.255-1.255v-3.537a1.255 1.255 0 0 1-1.167.793h-1.679a1.25 1.25 0 0 1-.77-.263 4.5 4.5 0 0 1-1.945.429c-.885 0-1.724-.21-2.495-.632l-.017-.01a5 5 0 0 1-1.081-.836 1.255 1.255 0 0 1-1.254 1.312h-1.81a1.255 1.255 0 0 1-1.228-.99l-.782-3.625-2.044 3.939a1.25 1.25 0 0 1-1.115.676h-.098a1.25 1.25 0 0 1-1.116-.68l-2.061-3.994zM35.92 16.63l.207-.114.223-.15q.493-.356.735-.785l.061-.118.033 1.332h1.678V9.242h-1.694l-.033 1.267q-.133-.329-.526-.658l-.032-.028a3.2 3.2 0 0 0-.668-.428l-.27-.12a3.3 3.3 0 0 0-1.235-.23q-1.136-.001-1.974.493a3.36 3.36 0 0 0-1.3 1.382q-.445.89-.444 2.074 0 1.2.51 2.107a3.8 3.8 0 0 0 1.382 1.381 3.9 3.9 0 0 0 1.893.477q.795 0 1.455-.33zm-2.789-5.38q-.576.675-.575 1.762 0 1.102.559 1.794.576.675 1.645.675a2.25 2.25 0 0 0 .934-.19 2.2 2.2 0 0 0 .468-.29l.178-.161a2.2 2.2 0 0 0 .397-.561q.244-.5.244-1.15v-.115q0-.708-.296-1.267l-.043-.077a2.2 2.2 0 0 0-.633-.709l-.13-.086-.047-.028a2.1 2.1 0 0 0-1.073-.285q-1.052 0-1.629.692zm2.316 2.706c.163-.17.28-.407.28-.83v-.114c0-.292-.06-.508-.15-.68a.96.96 0 0 0-.353-.389.85.85 0 0 0-.464-.127c-.4 0-.56.114-.664.239l-.01.012c-.148.174-.275.45-.275.945 0 .506.122.801.27.99.097.11.266.224.68.224.303 0 .504-.09.687-.269zm7.545 1.705a2.6 2.6 0 0 0 .331.423q.319.33.755.548l.173.074q.65.255 1.49.255 1.02 0 1.844-.493a3.45 3.45 0 0 0 1.316-1.4q.493-.904.493-2.089 0-1.909-.988-2.913-.988-1.02-2.584-1.02-.898 0-1.575.347a3 3 0 0 0-.415.262l-.199.166a3.4 3.4 0 0 0-.64.82V9.242h-1.712v11.553h1.729l-.017-5.134zm.53-1.138q.206.29.48.5l.155.11.053.034q.51.296 1.119.297 1.07 0 1.645-.675.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.435 0-.835.16a2 2 0 0 0-.284.136 2 2 0 0 0-.363.254 2.2 2.2 0 0 0-.46.569l-.082.162a2.6 2.6 0 0 0-.213 1.072v.115q0 .707.296 1.267l.135.211zm.964-.818a1.1 1.1 0 0 0 .367.385.94.94 0 0 0 .476.118c.423 0 .59-.117.687-.23.159-.194.28-.478.28-.95 0-.53-.133-.8-.266-.952l-.021-.025c-.078-.094-.231-.221-.68-.221a1 1 0 0 0-.503.135l-.012.007a.86.86 0 0 0-.335.343c-.073.133-.132.324-.132.614v.115a1.4 1.4 0 0 0 .14.66zm15.7-6.222q.347-.346.346-.856a1.05 1.05 0 0 0-.345-.79 1.18 1.18 0 0 0-.84-.329q-.51 0-.855.33a1.05 1.05 0 0 0-.346.79q0 .51.346.855.345.346.856.346.51 0 .839-.346zm4.337 9.314.033-1.332q.191.403.59.747l.098.081a4 4 0 0 0 .316.224l.223.122a3.2 3.2 0 0 0 1.44.322 3.8 3.8 0 0 0 1.875-.477 3.5 3.5 0 0 0 1.382-1.366q.527-.89.526-2.09 0-1.184-.444-2.073a3.24 3.24 0 0 0-1.283-1.399q-.823-.51-1.942-.51a3.5 3.5 0 0 0-1.527.344l-.086.043-.165.09a3 3 0 0 0-.33.214q-.432.315-.656.707a2 2 0 0 0-.099.198l.082-1.283V4.701h-1.744v12.095zm.473-2.509a2.5 2.5 0 0 0 .566.7q.117.098.245.18l.144.08a2.1 2.1 0 0 0 .975.232q1.07 0 1.645-.675.576-.69.576-1.778 0-1.102-.576-1.777-.56-.691-1.645-.692a2.2 2.2 0 0 0-1.015.235q-.22.113-.415.282l-.15.142a2.1 2.1 0 0 0-.42.594q-.223.479-.223 1.1v.115q0 .705.293 1.26zm2.616-.293c.157-.191.28-.479.28-.967 0-.51-.13-.79-.276-.961l-.021-.026c-.082-.1-.232-.225-.67-.225a.87.87 0 0 0-.681.279l-.012.011c-.154.155-.274.38-.274.807v.115c0 .285.057.499.144.669a1.1 1.1 0 0 0 .367.405c.137.082.28.123.455.123.423 0 .59-.118.686-.23zm8.266-3.013q.345-.13.724-.14l.069-.002q.493 0 .642.099l.247-1.794q-.196-.099-.717-.099a2.3 2.3 0 0 0-.545.063 2 2 0 0 0-.411.148 2.2 2.2 0 0 0-.4.249 2.5 2.5 0 0 0-.485.499 2.7 2.7 0 0 0-.32.581l-.05.137v-1.48h-1.778v7.553h1.777v-3.884q0-.546.159-.943a1.5 1.5 0 0 1 .466-.636 2.5 2.5 0 0 1 .399-.253 2 2 0 0 1 .224-.099zm9.784 2.656.05-.922q0-1.743-.856-2.698-.838-.97-2.584-.97-1.119-.001-2.007.493a3.46 3.46 0 0 0-1.4 1.382q-.493.906-.493 2.106 0 1.07.428 1.975.428.89 1.332 1.432.906.526 2.255.526.973 0 1.668-.185l.044-.012.135-.04q.613-.184.984-.421l-.542-1.267q-.3.162-.642.274l-.297.087q-.51.131-1.3.131-.954 0-1.497-.444a1.6 1.6 0 0 1-.192-.193q-.366-.44-.512-1.234l-.004-.021zm-5.427-1.256-.003.022h3.752v-.138q-.011-.727-.288-1.118a1 1 0 0 0-.156-.176q-.46-.428-1.316-.428-.986 0-1.494.604-.379.45-.494 1.234zm-27.053 2.77V4.7h-1.86v12.095h5.333V15.15zm7.103-5.908v7.553h-1.843V9.242h1.843z'/%3E%3Cpath fill='%23fff' d='m19.63 11.151-.757-1.71-.345 1.71-1.12 5.644h-1.827L18.083 4.7h.197l3.325 6.533.988 2.19.988-2.19L26.839 4.7h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.93 5.644h-.098l-2.913-5.644zm14.836 5.81q-1.02 0-1.893-.478a3.8 3.8 0 0 1-1.381-1.382q-.51-.906-.51-2.106 0-1.185.444-2.074a3.36 3.36 0 0 1 1.3-1.382q.839-.494 1.974-.494a3.3 3.3 0 0 1 1.234.231 3.3 3.3 0 0 1 .97.575q.396.33.527.659l.033-1.267h1.694v7.553H37.18l-.033-1.332q-.279.593-1.02 1.053a3.17 3.17 0 0 1-1.662.444zm.296-1.482q.938 0 1.58-.642.642-.66.642-1.711v-.115q0-.708-.296-1.267a2.2 2.2 0 0 0-.807-.872 2.1 2.1 0 0 0-1.119-.313q-1.053 0-1.629.692-.575.675-.575 1.76 0 1.103.559 1.795.577.675 1.645.675zm6.521-6.237h1.711v1.4q.906-1.597 2.83-1.597 1.596 0 2.584 1.02.988 1.005.988 2.914 0 1.185-.493 2.09a3.46 3.46 0 0 1-1.316 1.399 3.5 3.5 0 0 1-1.844.493q-.954 0-1.662-.329a2.67 2.67 0 0 1-1.086-.97l.017 5.134h-1.728zm4.048 6.22q1.07 0 1.645-.674.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.592 0-1.12.296-.51.28-.822.823-.296.527-.296 1.234v.115q0 .708.296 1.267.313.543.823.855.51.296 1.119.297z'/%3E%3Cpath fill='%23e1e3e9' d='M51.325 4.7h1.86v10.45h3.473v1.646h-5.333zm7.12 4.542h1.843v7.553h-1.843zm.905-1.415a1.16 1.16 0 0 1-.856-.346 1.17 1.17 0 0 1-.346-.856 1.05 1.05 0 0 1 .346-.79q.346-.329.856-.329.494 0 .839.33a1.05 1.05 0 0 1 .345.79 1.16 1.16 0 0 1-.345.855q-.33.346-.84.346zm7.875 9.133a3.17 3.17 0 0 1-1.662-.444q-.723-.46-1.004-1.053l-.033 1.332h-1.71V4.701h1.743v4.657l-.082 1.283q.279-.658 1.086-1.119a3.5 3.5 0 0 1 1.778-.477q1.119 0 1.942.51a3.24 3.24 0 0 1 1.283 1.4q.445.888.444 2.072 0 1.201-.526 2.09a3.5 3.5 0 0 1-1.382 1.366 3.8 3.8 0 0 1-1.876.477zm-.296-1.481q1.069 0 1.645-.675.577-.69.577-1.778 0-1.102-.577-1.776-.56-.691-1.645-.692a2.12 2.12 0 0 0-1.58.659q-.642.641-.642 1.694v.115q0 .71.296 1.267a2.4 2.4 0 0 0 .807.872 2.1 2.1 0 0 0 1.119.313zm5.927-6.237h1.777v1.481q.263-.757.856-1.217a2.14 2.14 0 0 1 1.349-.46q.527 0 .724.098l-.247 1.794q-.149-.099-.642-.099-.774 0-1.416.494-.626.493-.626 1.58v3.883h-1.777V9.242zm9.534 7.718q-1.35 0-2.255-.526-.904-.543-1.332-1.432a4.6 4.6 0 0 1-.428-1.975q0-1.2.493-2.106a3.46 3.46 0 0 1 1.4-1.382q.889-.495 2.007-.494 1.744 0 2.584.97.855.956.856 2.7 0 .444-.05.92h-5.43q.18 1.005.708 1.45.542.443 1.497.443.79 0 1.3-.131a4 4 0 0 0 .938-.362l.542 1.267q-.411.263-1.119.46-.708.198-1.711.197zm1.596-4.558q.016-1.02-.444-1.432-.46-.428-1.316-.428-1.728 0-1.991 1.86z'/%3E%3Cpath d='M5.074 15.948a.484.657 0 0 0-.486.659v1.84a.484.657 0 0 0 .486.659h4.101a.484.657 0 0 0 .486-.659v-1.84a.484.657 0 0 0-.486-.659zm3.56 1.16H5.617v.838h3.017z' style='fill:%23fff;fill-rule:evenodd;stroke-width:1.03600001'/%3E%3Cg style='stroke-width:1.12603545'%3E%3Cpath d='M-9.408-1.416c-3.833-.025-7.056 2.912-7.08 6.615-.02 3.08 1.653 4.832 3.107 6.268.903.892 1.721 1.74 2.32 2.902l-.525-.004c-.543-.003-.992.304-1.24.639a1.87 1.87 0 0 0-.362 1.121l-.011 1.877c-.003.402.104.787.347 1.125.244.338.688.653 1.23.656l4.142.028c.542.003.99-.306 1.238-.641a1.87 1.87 0 0 0 .363-1.121l.012-1.875a1.87 1.87 0 0 0-.348-1.127c-.243-.338-.688-.653-1.23-.656l-.518-.004c.597-1.145 1.425-1.983 2.348-2.87 1.473-1.414 3.18-3.149 3.2-6.226-.016-3.59-2.923-6.684-6.993-6.707m-.006 1.1v.002c3.274.02 5.92 2.532 5.9 5.6-.017 2.706-1.39 4.026-2.863 5.44-1.034.994-2.118 2.033-2.814 3.633-.018.041-.052.055-.075.065q-.013.004-.02.01a.34.34 0 0 1-.226.084.34.34 0 0 1-.224-.086l-.092-.077c-.699-1.615-1.768-2.669-2.781-3.67-1.454-1.435-2.797-2.762-2.78-5.478.02-3.067 2.7-5.545 5.975-5.523m-.02 2.826c-1.62-.01-2.944 1.315-2.955 2.96-.01 1.646 1.295 2.988 2.916 2.999h.002c1.621.01 2.943-1.316 2.953-2.961.011-1.646-1.294-2.988-2.916-2.998m-.005 1.1c1.017.006 1.829.83 1.822 1.89s-.83 1.874-1.848 1.867c-1.018-.006-1.829-.83-1.822-1.89s.83-1.874 1.848-1.868m-2.155 11.857 4.14.025c.271.002.49.305.487.676l-.013 1.875c-.003.37-.224.67-.495.668l-4.14-.025c-.27-.002-.487-.306-.485-.676l.012-1.875c.003-.37.224-.67.494-.668' style='color:%23000;font-style:normal;font-variant:normal;font-weight:400;font-stretch:normal;font-size:medium;line-height:normal;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:%23000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;clip-rule:evenodd;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:%23000;solid-opacity:1;vector-effect:none;fill:%23000;fill-opacity:.4;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-9.415-.316C-12.69-.338-15.37 2.14-15.39 5.207c-.017 2.716 1.326 4.041 2.78 5.477 1.013 1 2.081 2.055 2.78 3.67l.092.076a.34.34 0 0 0 .225.086.34.34 0 0 0 .227-.083l.019-.01c.022-.009.057-.024.074-.064.697-1.6 1.78-2.64 2.814-3.634 1.473-1.414 2.847-2.733 2.864-5.44.02-3.067-2.627-5.58-5.901-5.601m-.057 8.784c1.621.011 2.944-1.315 2.955-2.96.01-1.646-1.295-2.988-2.916-2.999-1.622-.01-2.945 1.315-2.955 2.96s1.295 2.989 2.916 3' style='clip-rule:evenodd;fill:%23e1e3e9;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-11.594 15.465c-.27-.002-.492.297-.494.668l-.012 1.876c-.003.371.214.673.485.675l4.14.027c.271.002.492-.298.495-.668l.012-1.877c.003-.37-.215-.672-.485-.674z' style='clip-rule:evenodd;fill:%23fff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3C/g%3E%3C/svg%3E");background-repeat:no-repeat;cursor:pointer;display:block;height:23px;margin:0 0 -4px -4px;overflow:hidden;width:88px}a.maplibregl-ctrl-logo.maplibregl-compact{width:14px}@media (forced-colors:active){a.maplibregl-ctrl-logo{background-color:transparent;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='23' fill='none'%3E%3Cpath fill='%23000' fill-opacity='.4' fill-rule='evenodd' d='M17.408 16.796h-1.827l2.501-12.095h.198l3.324 6.533.988 2.19.988-2.19 3.258-6.533h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.929 5.644h-.098l-2.914-5.644-.757-1.71-.345 1.71zm1.958-3.42-.726 3.663a1.255 1.255 0 0 1-1.232 1.011h-1.827a1.255 1.255 0 0 1-1.229-1.509l2.501-12.095a1.255 1.255 0 0 1 1.23-1.001h.197a1.25 1.25 0 0 1 1.12.685l3.19 6.273 3.125-6.263a1.25 1.25 0 0 1 1.123-.695h.181a1.255 1.255 0 0 1 1.227.991l1.443 6.71a5 5 0 0 1 .314-.787l.009-.016a4.6 4.6 0 0 1 1.777-1.887c.782-.46 1.668-.667 2.611-.667a4.6 4.6 0 0 1 1.7.32l.306.134c.21-.16.474-.256.759-.256h1.694a1.255 1.255 0 0 1 1.212.925 1.255 1.255 0 0 1 1.212-.925h1.711c.284 0 .545.094.755.252.613-.3 1.312-.45 2.075-.45 1.356 0 2.557.445 3.482 1.4q.47.48.763 1.064V4.701a1.255 1.255 0 0 1 1.255-1.255h1.86A1.255 1.255 0 0 1 54.44 4.7v9.194h2.217c.19 0 .37.043.532.118v-4.77c0-.356.147-.678.385-.906a2.42 2.42 0 0 1-.682-1.71c0-.665.267-1.253.735-1.7a2.45 2.45 0 0 1 1.722-.674 2.43 2.43 0 0 1 1.705.675q.318.302.504.683V4.7a1.255 1.255 0 0 1 1.255-1.255h1.744A1.255 1.255 0 0 1 65.812 4.7v3.335a4.8 4.8 0 0 1 1.526-.246c.938 0 1.817.214 2.59.69a4.47 4.47 0 0 1 1.67 1.743v-.98a1.255 1.255 0 0 1 1.256-1.256h1.777c.233 0 .451.064.639.174a3.4 3.4 0 0 1 1.567-.372c.346 0 .861.02 1.285.232a1.25 1.25 0 0 1 .689 1.004 4.7 4.7 0 0 1 .853-.588c.795-.44 1.675-.647 2.61-.647 1.385 0 2.65.39 3.525 1.396.836.938 1.168 2.173 1.168 3.528q-.001.515-.056 1.051a1.255 1.255 0 0 1-.947 1.09l.408.952a1.255 1.255 0 0 1-.477 1.552c-.418.268-.92.463-1.458.612-.613.171-1.304.244-2.049.244-1.06 0-2.043-.207-2.886-.698l-.015-.008c-.798-.48-1.419-1.135-1.818-1.963l-.004-.008a5.8 5.8 0 0 1-.548-2.512q0-.429.053-.843a1.3 1.3 0 0 1-.333-.086l-.166-.004c-.223 0-.426.062-.643.228-.03.024-.142.139-.142.59v3.883a1.255 1.255 0 0 1-1.256 1.256h-1.777a1.255 1.255 0 0 1-1.256-1.256V15.69l-.032.057a4.8 4.8 0 0 1-1.86 1.833 5.04 5.04 0 0 1-2.484.634 4.5 4.5 0 0 1-1.935-.424 1.25 1.25 0 0 1-.764.258h-1.71a1.255 1.255 0 0 1-1.256-1.255V7.687a2.4 2.4 0 0 1-.428.625c.253.23.412.561.412.93v7.553a1.255 1.255 0 0 1-1.256 1.255h-1.843a1.25 1.25 0 0 1-.894-.373c-.228.23-.544.373-.894.373H51.32a1.255 1.255 0 0 1-1.256-1.255v-1.251l-.061.117a4.7 4.7 0 0 1-1.782 1.884 4.77 4.77 0 0 1-2.485.67 5.6 5.6 0 0 1-1.485-.188l.009 2.764a1.255 1.255 0 0 1-1.255 1.259h-1.729a1.255 1.255 0 0 1-1.255-1.255v-3.537a1.255 1.255 0 0 1-1.167.793h-1.679a1.25 1.25 0 0 1-.77-.263 4.5 4.5 0 0 1-1.945.429c-.885 0-1.724-.21-2.495-.632l-.017-.01a5 5 0 0 1-1.081-.836 1.255 1.255 0 0 1-1.254 1.312h-1.81a1.255 1.255 0 0 1-1.228-.99l-.782-3.625-2.044 3.939a1.25 1.25 0 0 1-1.115.676h-.098a1.25 1.25 0 0 1-1.116-.68l-2.061-3.994zM35.92 16.63l.207-.114.223-.15q.493-.356.735-.785l.061-.118.033 1.332h1.678V9.242h-1.694l-.033 1.267q-.133-.329-.526-.658l-.032-.028a3.2 3.2 0 0 0-.668-.428l-.27-.12a3.3 3.3 0 0 0-1.235-.23q-1.136-.001-1.974.493a3.36 3.36 0 0 0-1.3 1.382q-.445.89-.444 2.074 0 1.2.51 2.107a3.8 3.8 0 0 0 1.382 1.381 3.9 3.9 0 0 0 1.893.477q.795 0 1.455-.33zm-2.789-5.38q-.576.675-.575 1.762 0 1.102.559 1.794.576.675 1.645.675a2.25 2.25 0 0 0 .934-.19 2.2 2.2 0 0 0 .468-.29l.178-.161a2.2 2.2 0 0 0 .397-.561q.244-.5.244-1.15v-.115q0-.708-.296-1.267l-.043-.077a2.2 2.2 0 0 0-.633-.709l-.13-.086-.047-.028a2.1 2.1 0 0 0-1.073-.285q-1.052 0-1.629.692zm2.316 2.706c.163-.17.28-.407.28-.83v-.114c0-.292-.06-.508-.15-.68a.96.96 0 0 0-.353-.389.85.85 0 0 0-.464-.127c-.4 0-.56.114-.664.239l-.01.012c-.148.174-.275.45-.275.945 0 .506.122.801.27.99.097.11.266.224.68.224.303 0 .504-.09.687-.269zm7.545 1.705a2.6 2.6 0 0 0 .331.423q.319.33.755.548l.173.074q.65.255 1.49.255 1.02 0 1.844-.493a3.45 3.45 0 0 0 1.316-1.4q.493-.904.493-2.089 0-1.909-.988-2.913-.988-1.02-2.584-1.02-.898 0-1.575.347a3 3 0 0 0-.415.262l-.199.166a3.4 3.4 0 0 0-.64.82V9.242h-1.712v11.553h1.729l-.017-5.134zm.53-1.138q.206.29.48.5l.155.11.053.034q.51.296 1.119.297 1.07 0 1.645-.675.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.435 0-.835.16a2 2 0 0 0-.284.136 2 2 0 0 0-.363.254 2.2 2.2 0 0 0-.46.569l-.082.162a2.6 2.6 0 0 0-.213 1.072v.115q0 .707.296 1.267l.135.211zm.964-.818a1.1 1.1 0 0 0 .367.385.94.94 0 0 0 .476.118c.423 0 .59-.117.687-.23.159-.194.28-.478.28-.95 0-.53-.133-.8-.266-.952l-.021-.025c-.078-.094-.231-.221-.68-.221a1 1 0 0 0-.503.135l-.012.007a.86.86 0 0 0-.335.343c-.073.133-.132.324-.132.614v.115a1.4 1.4 0 0 0 .14.66zm15.7-6.222q.347-.346.346-.856a1.05 1.05 0 0 0-.345-.79 1.18 1.18 0 0 0-.84-.329q-.51 0-.855.33a1.05 1.05 0 0 0-.346.79q0 .51.346.855.345.346.856.346.51 0 .839-.346zm4.337 9.314.033-1.332q.191.403.59.747l.098.081a4 4 0 0 0 .316.224l.223.122a3.2 3.2 0 0 0 1.44.322 3.8 3.8 0 0 0 1.875-.477 3.5 3.5 0 0 0 1.382-1.366q.527-.89.526-2.09 0-1.184-.444-2.073a3.24 3.24 0 0 0-1.283-1.399q-.823-.51-1.942-.51a3.5 3.5 0 0 0-1.527.344l-.086.043-.165.09a3 3 0 0 0-.33.214q-.432.315-.656.707a2 2 0 0 0-.099.198l.082-1.283V4.701h-1.744v12.095zm.473-2.509a2.5 2.5 0 0 0 .566.7q.117.098.245.18l.144.08a2.1 2.1 0 0 0 .975.232q1.07 0 1.645-.675.576-.69.576-1.778 0-1.102-.576-1.777-.56-.691-1.645-.692a2.2 2.2 0 0 0-1.015.235q-.22.113-.415.282l-.15.142a2.1 2.1 0 0 0-.42.594q-.223.479-.223 1.1v.115q0 .705.293 1.26zm2.616-.293c.157-.191.28-.479.28-.967 0-.51-.13-.79-.276-.961l-.021-.026c-.082-.1-.232-.225-.67-.225a.87.87 0 0 0-.681.279l-.012.011c-.154.155-.274.38-.274.807v.115c0 .285.057.499.144.669a1.1 1.1 0 0 0 .367.405c.137.082.28.123.455.123.423 0 .59-.118.686-.23zm8.266-3.013q.345-.13.724-.14l.069-.002q.493 0 .642.099l.247-1.794q-.196-.099-.717-.099a2.3 2.3 0 0 0-.545.063 2 2 0 0 0-.411.148 2.2 2.2 0 0 0-.4.249 2.5 2.5 0 0 0-.485.499 2.7 2.7 0 0 0-.32.581l-.05.137v-1.48h-1.778v7.553h1.777v-3.884q0-.546.159-.943a1.5 1.5 0 0 1 .466-.636 2.5 2.5 0 0 1 .399-.253 2 2 0 0 1 .224-.099zm9.784 2.656.05-.922q0-1.743-.856-2.698-.838-.97-2.584-.97-1.119-.001-2.007.493a3.46 3.46 0 0 0-1.4 1.382q-.493.906-.493 2.106 0 1.07.428 1.975.428.89 1.332 1.432.906.526 2.255.526.973 0 1.668-.185l.044-.012.135-.04q.613-.184.984-.421l-.542-1.267q-.3.162-.642.274l-.297.087q-.51.131-1.3.131-.954 0-1.497-.444a1.6 1.6 0 0 1-.192-.193q-.366-.44-.512-1.234l-.004-.021zm-5.427-1.256-.003.022h3.752v-.138q-.011-.727-.288-1.118a1 1 0 0 0-.156-.176q-.46-.428-1.316-.428-.986 0-1.494.604-.379.45-.494 1.234zm-27.053 2.77V4.7h-1.86v12.095h5.333V15.15zm7.103-5.908v7.553h-1.843V9.242h1.843z'/%3E%3Cpath fill='%23fff' d='m19.63 11.151-.757-1.71-.345 1.71-1.12 5.644h-1.827L18.083 4.7h.197l3.325 6.533.988 2.19.988-2.19L26.839 4.7h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.93 5.644h-.098l-2.913-5.644zm14.836 5.81q-1.02 0-1.893-.478a3.8 3.8 0 0 1-1.381-1.382q-.51-.906-.51-2.106 0-1.185.444-2.074a3.36 3.36 0 0 1 1.3-1.382q.839-.494 1.974-.494a3.3 3.3 0 0 1 1.234.231 3.3 3.3 0 0 1 .97.575q.396.33.527.659l.033-1.267h1.694v7.553H37.18l-.033-1.332q-.279.593-1.02 1.053a3.17 3.17 0 0 1-1.662.444zm.296-1.482q.938 0 1.58-.642.642-.66.642-1.711v-.115q0-.708-.296-1.267a2.2 2.2 0 0 0-.807-.872 2.1 2.1 0 0 0-1.119-.313q-1.053 0-1.629.692-.575.675-.575 1.76 0 1.103.559 1.795.577.675 1.645.675zm6.521-6.237h1.711v1.4q.906-1.597 2.83-1.597 1.596 0 2.584 1.02.988 1.005.988 2.914 0 1.185-.493 2.09a3.46 3.46 0 0 1-1.316 1.399 3.5 3.5 0 0 1-1.844.493q-.954 0-1.662-.329a2.67 2.67 0 0 1-1.086-.97l.017 5.134h-1.728zm4.048 6.22q1.07 0 1.645-.674.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.592 0-1.12.296-.51.28-.822.823-.296.527-.296 1.234v.115q0 .708.296 1.267.313.543.823.855.51.296 1.119.297z'/%3E%3Cpath fill='%23e1e3e9' d='M51.325 4.7h1.86v10.45h3.473v1.646h-5.333zm7.12 4.542h1.843v7.553h-1.843zm.905-1.415a1.16 1.16 0 0 1-.856-.346 1.17 1.17 0 0 1-.346-.856 1.05 1.05 0 0 1 .346-.79q.346-.329.856-.329.494 0 .839.33a1.05 1.05 0 0 1 .345.79 1.16 1.16 0 0 1-.345.855q-.33.346-.84.346zm7.875 9.133a3.17 3.17 0 0 1-1.662-.444q-.723-.46-1.004-1.053l-.033 1.332h-1.71V4.701h1.743v4.657l-.082 1.283q.279-.658 1.086-1.119a3.5 3.5 0 0 1 1.778-.477q1.119 0 1.942.51a3.24 3.24 0 0 1 1.283 1.4q.445.888.444 2.072 0 1.201-.526 2.09a3.5 3.5 0 0 1-1.382 1.366 3.8 3.8 0 0 1-1.876.477zm-.296-1.481q1.069 0 1.645-.675.577-.69.577-1.778 0-1.102-.577-1.776-.56-.691-1.645-.692a2.12 2.12 0 0 0-1.58.659q-.642.641-.642 1.694v.115q0 .71.296 1.267a2.4 2.4 0 0 0 .807.872 2.1 2.1 0 0 0 1.119.313zm5.927-6.237h1.777v1.481q.263-.757.856-1.217a2.14 2.14 0 0 1 1.349-.46q.527 0 .724.098l-.247 1.794q-.149-.099-.642-.099-.774 0-1.416.494-.626.493-.626 1.58v3.883h-1.777V9.242zm9.534 7.718q-1.35 0-2.255-.526-.904-.543-1.332-1.432a4.6 4.6 0 0 1-.428-1.975q0-1.2.493-2.106a3.46 3.46 0 0 1 1.4-1.382q.889-.495 2.007-.494 1.744 0 2.584.97.855.956.856 2.7 0 .444-.05.92h-5.43q.18 1.005.708 1.45.542.443 1.497.443.79 0 1.3-.131a4 4 0 0 0 .938-.362l.542 1.267q-.411.263-1.119.46-.708.198-1.711.197zm1.596-4.558q.016-1.02-.444-1.432-.46-.428-1.316-.428-1.728 0-1.991 1.86z'/%3E%3Cpath d='M5.074 15.948a.484.657 0 0 0-.486.659v1.84a.484.657 0 0 0 .486.659h4.101a.484.657 0 0 0 .486-.659v-1.84a.484.657 0 0 0-.486-.659zm3.56 1.16H5.617v.838h3.017z' style='fill:%23fff;fill-rule:evenodd;stroke-width:1.03600001'/%3E%3Cg style='stroke-width:1.12603545'%3E%3Cpath d='M-9.408-1.416c-3.833-.025-7.056 2.912-7.08 6.615-.02 3.08 1.653 4.832 3.107 6.268.903.892 1.721 1.74 2.32 2.902l-.525-.004c-.543-.003-.992.304-1.24.639a1.87 1.87 0 0 0-.362 1.121l-.011 1.877c-.003.402.104.787.347 1.125.244.338.688.653 1.23.656l4.142.028c.542.003.99-.306 1.238-.641a1.87 1.87 0 0 0 .363-1.121l.012-1.875a1.87 1.87 0 0 0-.348-1.127c-.243-.338-.688-.653-1.23-.656l-.518-.004c.597-1.145 1.425-1.983 2.348-2.87 1.473-1.414 3.18-3.149 3.2-6.226-.016-3.59-2.923-6.684-6.993-6.707m-.006 1.1v.002c3.274.02 5.92 2.532 5.9 5.6-.017 2.706-1.39 4.026-2.863 5.44-1.034.994-2.118 2.033-2.814 3.633-.018.041-.052.055-.075.065q-.013.004-.02.01a.34.34 0 0 1-.226.084.34.34 0 0 1-.224-.086l-.092-.077c-.699-1.615-1.768-2.669-2.781-3.67-1.454-1.435-2.797-2.762-2.78-5.478.02-3.067 2.7-5.545 5.975-5.523m-.02 2.826c-1.62-.01-2.944 1.315-2.955 2.96-.01 1.646 1.295 2.988 2.916 2.999h.002c1.621.01 2.943-1.316 2.953-2.961.011-1.646-1.294-2.988-2.916-2.998m-.005 1.1c1.017.006 1.829.83 1.822 1.89s-.83 1.874-1.848 1.867c-1.018-.006-1.829-.83-1.822-1.89s.83-1.874 1.848-1.868m-2.155 11.857 4.14.025c.271.002.49.305.487.676l-.013 1.875c-.003.37-.224.67-.495.668l-4.14-.025c-.27-.002-.487-.306-.485-.676l.012-1.875c.003-.37.224-.67.494-.668' style='color:%23000;font-style:normal;font-variant:normal;font-weight:400;font-stretch:normal;font-size:medium;line-height:normal;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:%23000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;clip-rule:evenodd;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:%23000;solid-opacity:1;vector-effect:none;fill:%23000;fill-opacity:.4;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-9.415-.316C-12.69-.338-15.37 2.14-15.39 5.207c-.017 2.716 1.326 4.041 2.78 5.477 1.013 1 2.081 2.055 2.78 3.67l.092.076a.34.34 0 0 0 .225.086.34.34 0 0 0 .227-.083l.019-.01c.022-.009.057-.024.074-.064.697-1.6 1.78-2.64 2.814-3.634 1.473-1.414 2.847-2.733 2.864-5.44.02-3.067-2.627-5.58-5.901-5.601m-.057 8.784c1.621.011 2.944-1.315 2.955-2.96.01-1.646-1.295-2.988-2.916-2.999-1.622-.01-2.945 1.315-2.955 2.96s1.295 2.989 2.916 3' style='clip-rule:evenodd;fill:%23e1e3e9;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-11.594 15.465c-.27-.002-.492.297-.494.668l-.012 1.876c-.003.371.214.673.485.675l4.14.027c.271.002.492-.298.495-.668l.012-1.877c.003-.37-.215-.672-.485-.674z' style='clip-rule:evenodd;fill:%23fff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3C/g%3E%3C/svg%3E")}}@media (forced-colors:active) and (prefers-color-scheme:light){a.maplibregl-ctrl-logo{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='23' fill='none'%3E%3Cpath fill='%23000' fill-opacity='.4' fill-rule='evenodd' d='M17.408 16.796h-1.827l2.501-12.095h.198l3.324 6.533.988 2.19.988-2.19 3.258-6.533h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.929 5.644h-.098l-2.914-5.644-.757-1.71-.345 1.71zm1.958-3.42-.726 3.663a1.255 1.255 0 0 1-1.232 1.011h-1.827a1.255 1.255 0 0 1-1.229-1.509l2.501-12.095a1.255 1.255 0 0 1 1.23-1.001h.197a1.25 1.25 0 0 1 1.12.685l3.19 6.273 3.125-6.263a1.25 1.25 0 0 1 1.123-.695h.181a1.255 1.255 0 0 1 1.227.991l1.443 6.71a5 5 0 0 1 .314-.787l.009-.016a4.6 4.6 0 0 1 1.777-1.887c.782-.46 1.668-.667 2.611-.667a4.6 4.6 0 0 1 1.7.32l.306.134c.21-.16.474-.256.759-.256h1.694a1.255 1.255 0 0 1 1.212.925 1.255 1.255 0 0 1 1.212-.925h1.711c.284 0 .545.094.755.252.613-.3 1.312-.45 2.075-.45 1.356 0 2.557.445 3.482 1.4q.47.48.763 1.064V4.701a1.255 1.255 0 0 1 1.255-1.255h1.86A1.255 1.255 0 0 1 54.44 4.7v9.194h2.217c.19 0 .37.043.532.118v-4.77c0-.356.147-.678.385-.906a2.42 2.42 0 0 1-.682-1.71c0-.665.267-1.253.735-1.7a2.45 2.45 0 0 1 1.722-.674 2.43 2.43 0 0 1 1.705.675q.318.302.504.683V4.7a1.255 1.255 0 0 1 1.255-1.255h1.744A1.255 1.255 0 0 1 65.812 4.7v3.335a4.8 4.8 0 0 1 1.526-.246c.938 0 1.817.214 2.59.69a4.47 4.47 0 0 1 1.67 1.743v-.98a1.255 1.255 0 0 1 1.256-1.256h1.777c.233 0 .451.064.639.174a3.4 3.4 0 0 1 1.567-.372c.346 0 .861.02 1.285.232a1.25 1.25 0 0 1 .689 1.004 4.7 4.7 0 0 1 .853-.588c.795-.44 1.675-.647 2.61-.647 1.385 0 2.65.39 3.525 1.396.836.938 1.168 2.173 1.168 3.528q-.001.515-.056 1.051a1.255 1.255 0 0 1-.947 1.09l.408.952a1.255 1.255 0 0 1-.477 1.552c-.418.268-.92.463-1.458.612-.613.171-1.304.244-2.049.244-1.06 0-2.043-.207-2.886-.698l-.015-.008c-.798-.48-1.419-1.135-1.818-1.963l-.004-.008a5.8 5.8 0 0 1-.548-2.512q0-.429.053-.843a1.3 1.3 0 0 1-.333-.086l-.166-.004c-.223 0-.426.062-.643.228-.03.024-.142.139-.142.59v3.883a1.255 1.255 0 0 1-1.256 1.256h-1.777a1.255 1.255 0 0 1-1.256-1.256V15.69l-.032.057a4.8 4.8 0 0 1-1.86 1.833 5.04 5.04 0 0 1-2.484.634 4.5 4.5 0 0 1-1.935-.424 1.25 1.25 0 0 1-.764.258h-1.71a1.255 1.255 0 0 1-1.256-1.255V7.687a2.4 2.4 0 0 1-.428.625c.253.23.412.561.412.93v7.553a1.255 1.255 0 0 1-1.256 1.255h-1.843a1.25 1.25 0 0 1-.894-.373c-.228.23-.544.373-.894.373H51.32a1.255 1.255 0 0 1-1.256-1.255v-1.251l-.061.117a4.7 4.7 0 0 1-1.782 1.884 4.77 4.77 0 0 1-2.485.67 5.6 5.6 0 0 1-1.485-.188l.009 2.764a1.255 1.255 0 0 1-1.255 1.259h-1.729a1.255 1.255 0 0 1-1.255-1.255v-3.537a1.255 1.255 0 0 1-1.167.793h-1.679a1.25 1.25 0 0 1-.77-.263 4.5 4.5 0 0 1-1.945.429c-.885 0-1.724-.21-2.495-.632l-.017-.01a5 5 0 0 1-1.081-.836 1.255 1.255 0 0 1-1.254 1.312h-1.81a1.255 1.255 0 0 1-1.228-.99l-.782-3.625-2.044 3.939a1.25 1.25 0 0 1-1.115.676h-.098a1.25 1.25 0 0 1-1.116-.68l-2.061-3.994zM35.92 16.63l.207-.114.223-.15q.493-.356.735-.785l.061-.118.033 1.332h1.678V9.242h-1.694l-.033 1.267q-.133-.329-.526-.658l-.032-.028a3.2 3.2 0 0 0-.668-.428l-.27-.12a3.3 3.3 0 0 0-1.235-.23q-1.136-.001-1.974.493a3.36 3.36 0 0 0-1.3 1.382q-.445.89-.444 2.074 0 1.2.51 2.107a3.8 3.8 0 0 0 1.382 1.381 3.9 3.9 0 0 0 1.893.477q.795 0 1.455-.33zm-2.789-5.38q-.576.675-.575 1.762 0 1.102.559 1.794.576.675 1.645.675a2.25 2.25 0 0 0 .934-.19 2.2 2.2 0 0 0 .468-.29l.178-.161a2.2 2.2 0 0 0 .397-.561q.244-.5.244-1.15v-.115q0-.708-.296-1.267l-.043-.077a2.2 2.2 0 0 0-.633-.709l-.13-.086-.047-.028a2.1 2.1 0 0 0-1.073-.285q-1.052 0-1.629.692zm2.316 2.706c.163-.17.28-.407.28-.83v-.114c0-.292-.06-.508-.15-.68a.96.96 0 0 0-.353-.389.85.85 0 0 0-.464-.127c-.4 0-.56.114-.664.239l-.01.012c-.148.174-.275.45-.275.945 0 .506.122.801.27.99.097.11.266.224.68.224.303 0 .504-.09.687-.269zm7.545 1.705a2.6 2.6 0 0 0 .331.423q.319.33.755.548l.173.074q.65.255 1.49.255 1.02 0 1.844-.493a3.45 3.45 0 0 0 1.316-1.4q.493-.904.493-2.089 0-1.909-.988-2.913-.988-1.02-2.584-1.02-.898 0-1.575.347a3 3 0 0 0-.415.262l-.199.166a3.4 3.4 0 0 0-.64.82V9.242h-1.712v11.553h1.729l-.017-5.134zm.53-1.138q.206.29.48.5l.155.11.053.034q.51.296 1.119.297 1.07 0 1.645-.675.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.435 0-.835.16a2 2 0 0 0-.284.136 2 2 0 0 0-.363.254 2.2 2.2 0 0 0-.46.569l-.082.162a2.6 2.6 0 0 0-.213 1.072v.115q0 .707.296 1.267l.135.211zm.964-.818a1.1 1.1 0 0 0 .367.385.94.94 0 0 0 .476.118c.423 0 .59-.117.687-.23.159-.194.28-.478.28-.95 0-.53-.133-.8-.266-.952l-.021-.025c-.078-.094-.231-.221-.68-.221a1 1 0 0 0-.503.135l-.012.007a.86.86 0 0 0-.335.343c-.073.133-.132.324-.132.614v.115a1.4 1.4 0 0 0 .14.66zm15.7-6.222q.347-.346.346-.856a1.05 1.05 0 0 0-.345-.79 1.18 1.18 0 0 0-.84-.329q-.51 0-.855.33a1.05 1.05 0 0 0-.346.79q0 .51.346.855.345.346.856.346.51 0 .839-.346zm4.337 9.314.033-1.332q.191.403.59.747l.098.081a4 4 0 0 0 .316.224l.223.122a3.2 3.2 0 0 0 1.44.322 3.8 3.8 0 0 0 1.875-.477 3.5 3.5 0 0 0 1.382-1.366q.527-.89.526-2.09 0-1.184-.444-2.073a3.24 3.24 0 0 0-1.283-1.399q-.823-.51-1.942-.51a3.5 3.5 0 0 0-1.527.344l-.086.043-.165.09a3 3 0 0 0-.33.214q-.432.315-.656.707a2 2 0 0 0-.099.198l.082-1.283V4.701h-1.744v12.095zm.473-2.509a2.5 2.5 0 0 0 .566.7q.117.098.245.18l.144.08a2.1 2.1 0 0 0 .975.232q1.07 0 1.645-.675.576-.69.576-1.778 0-1.102-.576-1.777-.56-.691-1.645-.692a2.2 2.2 0 0 0-1.015.235q-.22.113-.415.282l-.15.142a2.1 2.1 0 0 0-.42.594q-.223.479-.223 1.1v.115q0 .705.293 1.26zm2.616-.293c.157-.191.28-.479.28-.967 0-.51-.13-.79-.276-.961l-.021-.026c-.082-.1-.232-.225-.67-.225a.87.87 0 0 0-.681.279l-.012.011c-.154.155-.274.38-.274.807v.115c0 .285.057.499.144.669a1.1 1.1 0 0 0 .367.405c.137.082.28.123.455.123.423 0 .59-.118.686-.23zm8.266-3.013q.345-.13.724-.14l.069-.002q.493 0 .642.099l.247-1.794q-.196-.099-.717-.099a2.3 2.3 0 0 0-.545.063 2 2 0 0 0-.411.148 2.2 2.2 0 0 0-.4.249 2.5 2.5 0 0 0-.485.499 2.7 2.7 0 0 0-.32.581l-.05.137v-1.48h-1.778v7.553h1.777v-3.884q0-.546.159-.943a1.5 1.5 0 0 1 .466-.636 2.5 2.5 0 0 1 .399-.253 2 2 0 0 1 .224-.099zm9.784 2.656.05-.922q0-1.743-.856-2.698-.838-.97-2.584-.97-1.119-.001-2.007.493a3.46 3.46 0 0 0-1.4 1.382q-.493.906-.493 2.106 0 1.07.428 1.975.428.89 1.332 1.432.906.526 2.255.526.973 0 1.668-.185l.044-.012.135-.04q.613-.184.984-.421l-.542-1.267q-.3.162-.642.274l-.297.087q-.51.131-1.3.131-.954 0-1.497-.444a1.6 1.6 0 0 1-.192-.193q-.366-.44-.512-1.234l-.004-.021zm-5.427-1.256-.003.022h3.752v-.138q-.011-.727-.288-1.118a1 1 0 0 0-.156-.176q-.46-.428-1.316-.428-.986 0-1.494.604-.379.45-.494 1.234zm-27.053 2.77V4.7h-1.86v12.095h5.333V15.15zm7.103-5.908v7.553h-1.843V9.242h1.843z'/%3E%3Cpath fill='%23fff' d='m19.63 11.151-.757-1.71-.345 1.71-1.12 5.644h-1.827L18.083 4.7h.197l3.325 6.533.988 2.19.988-2.19L26.839 4.7h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.93 5.644h-.098l-2.913-5.644zm14.836 5.81q-1.02 0-1.893-.478a3.8 3.8 0 0 1-1.381-1.382q-.51-.906-.51-2.106 0-1.185.444-2.074a3.36 3.36 0 0 1 1.3-1.382q.839-.494 1.974-.494a3.3 3.3 0 0 1 1.234.231 3.3 3.3 0 0 1 .97.575q.396.33.527.659l.033-1.267h1.694v7.553H37.18l-.033-1.332q-.279.593-1.02 1.053a3.17 3.17 0 0 1-1.662.444zm.296-1.482q.938 0 1.58-.642.642-.66.642-1.711v-.115q0-.708-.296-1.267a2.2 2.2 0 0 0-.807-.872 2.1 2.1 0 0 0-1.119-.313q-1.053 0-1.629.692-.575.675-.575 1.76 0 1.103.559 1.795.577.675 1.645.675zm6.521-6.237h1.711v1.4q.906-1.597 2.83-1.597 1.596 0 2.584 1.02.988 1.005.988 2.914 0 1.185-.493 2.09a3.46 3.46 0 0 1-1.316 1.399 3.5 3.5 0 0 1-1.844.493q-.954 0-1.662-.329a2.67 2.67 0 0 1-1.086-.97l.017 5.134h-1.728zm4.048 6.22q1.07 0 1.645-.674.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.592 0-1.12.296-.51.28-.822.823-.296.527-.296 1.234v.115q0 .708.296 1.267.313.543.823.855.51.296 1.119.297z'/%3E%3Cpath fill='%23e1e3e9' d='M51.325 4.7h1.86v10.45h3.473v1.646h-5.333zm7.12 4.542h1.843v7.553h-1.843zm.905-1.415a1.16 1.16 0 0 1-.856-.346 1.17 1.17 0 0 1-.346-.856 1.05 1.05 0 0 1 .346-.79q.346-.329.856-.329.494 0 .839.33a1.05 1.05 0 0 1 .345.79 1.16 1.16 0 0 1-.345.855q-.33.346-.84.346zm7.875 9.133a3.17 3.17 0 0 1-1.662-.444q-.723-.46-1.004-1.053l-.033 1.332h-1.71V4.701h1.743v4.657l-.082 1.283q.279-.658 1.086-1.119a3.5 3.5 0 0 1 1.778-.477q1.119 0 1.942.51a3.24 3.24 0 0 1 1.283 1.4q.445.888.444 2.072 0 1.201-.526 2.09a3.5 3.5 0 0 1-1.382 1.366 3.8 3.8 0 0 1-1.876.477zm-.296-1.481q1.069 0 1.645-.675.577-.69.577-1.778 0-1.102-.577-1.776-.56-.691-1.645-.692a2.12 2.12 0 0 0-1.58.659q-.642.641-.642 1.694v.115q0 .71.296 1.267a2.4 2.4 0 0 0 .807.872 2.1 2.1 0 0 0 1.119.313zm5.927-6.237h1.777v1.481q.263-.757.856-1.217a2.14 2.14 0 0 1 1.349-.46q.527 0 .724.098l-.247 1.794q-.149-.099-.642-.099-.774 0-1.416.494-.626.493-.626 1.58v3.883h-1.777V9.242zm9.534 7.718q-1.35 0-2.255-.526-.904-.543-1.332-1.432a4.6 4.6 0 0 1-.428-1.975q0-1.2.493-2.106a3.46 3.46 0 0 1 1.4-1.382q.889-.495 2.007-.494 1.744 0 2.584.97.855.956.856 2.7 0 .444-.05.92h-5.43q.18 1.005.708 1.45.542.443 1.497.443.79 0 1.3-.131a4 4 0 0 0 .938-.362l.542 1.267q-.411.263-1.119.46-.708.198-1.711.197zm1.596-4.558q.016-1.02-.444-1.432-.46-.428-1.316-.428-1.728 0-1.991 1.86z'/%3E%3Cpath d='M5.074 15.948a.484.657 0 0 0-.486.659v1.84a.484.657 0 0 0 .486.659h4.101a.484.657 0 0 0 .486-.659v-1.84a.484.657 0 0 0-.486-.659zm3.56 1.16H5.617v.838h3.017z' style='fill:%23fff;fill-rule:evenodd;stroke-width:1.03600001'/%3E%3Cg style='stroke-width:1.12603545'%3E%3Cpath d='M-9.408-1.416c-3.833-.025-7.056 2.912-7.08 6.615-.02 3.08 1.653 4.832 3.107 6.268.903.892 1.721 1.74 2.32 2.902l-.525-.004c-.543-.003-.992.304-1.24.639a1.87 1.87 0 0 0-.362 1.121l-.011 1.877c-.003.402.104.787.347 1.125.244.338.688.653 1.23.656l4.142.028c.542.003.99-.306 1.238-.641a1.87 1.87 0 0 0 .363-1.121l.012-1.875a1.87 1.87 0 0 0-.348-1.127c-.243-.338-.688-.653-1.23-.656l-.518-.004c.597-1.145 1.425-1.983 2.348-2.87 1.473-1.414 3.18-3.149 3.2-6.226-.016-3.59-2.923-6.684-6.993-6.707m-.006 1.1v.002c3.274.02 5.92 2.532 5.9 5.6-.017 2.706-1.39 4.026-2.863 5.44-1.034.994-2.118 2.033-2.814 3.633-.018.041-.052.055-.075.065q-.013.004-.02.01a.34.34 0 0 1-.226.084.34.34 0 0 1-.224-.086l-.092-.077c-.699-1.615-1.768-2.669-2.781-3.67-1.454-1.435-2.797-2.762-2.78-5.478.02-3.067 2.7-5.545 5.975-5.523m-.02 2.826c-1.62-.01-2.944 1.315-2.955 2.96-.01 1.646 1.295 2.988 2.916 2.999h.002c1.621.01 2.943-1.316 2.953-2.961.011-1.646-1.294-2.988-2.916-2.998m-.005 1.1c1.017.006 1.829.83 1.822 1.89s-.83 1.874-1.848 1.867c-1.018-.006-1.829-.83-1.822-1.89s.83-1.874 1.848-1.868m-2.155 11.857 4.14.025c.271.002.49.305.487.676l-.013 1.875c-.003.37-.224.67-.495.668l-4.14-.025c-.27-.002-.487-.306-.485-.676l.012-1.875c.003-.37.224-.67.494-.668' style='color:%23000;font-style:normal;font-variant:normal;font-weight:400;font-stretch:normal;font-size:medium;line-height:normal;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:%23000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;clip-rule:evenodd;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:%23000;solid-opacity:1;vector-effect:none;fill:%23000;fill-opacity:.4;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-9.415-.316C-12.69-.338-15.37 2.14-15.39 5.207c-.017 2.716 1.326 4.041 2.78 5.477 1.013 1 2.081 2.055 2.78 3.67l.092.076a.34.34 0 0 0 .225.086.34.34 0 0 0 .227-.083l.019-.01c.022-.009.057-.024.074-.064.697-1.6 1.78-2.64 2.814-3.634 1.473-1.414 2.847-2.733 2.864-5.44.02-3.067-2.627-5.58-5.901-5.601m-.057 8.784c1.621.011 2.944-1.315 2.955-2.96.01-1.646-1.295-2.988-2.916-2.999-1.622-.01-2.945 1.315-2.955 2.96s1.295 2.989 2.916 3' style='clip-rule:evenodd;fill:%23e1e3e9;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-11.594 15.465c-.27-.002-.492.297-.494.668l-.012 1.876c-.003.371.214.673.485.675l4.14.027c.271.002.492-.298.495-.668l.012-1.877c.003-.37-.215-.672-.485-.674z' style='clip-rule:evenodd;fill:%23fff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3C/g%3E%3C/svg%3E")}}.maplibregl-ctrl.maplibregl-ctrl-attrib{background-color:hsla(0,0%,100%,.5);margin:0;padding:0 5px}@media screen{.maplibregl-ctrl-attrib.maplibregl-compact{background-color:#fff;border-radius:12px;box-sizing:content-box;color:#000;margin:10px;min-height:20px;padding:2px 24px 2px 0;position:relative}.maplibregl-ctrl-attrib.maplibregl-compact-show{padding:2px 28px 2px 8px;visibility:visible}.maplibregl-ctrl-bottom-left>.maplibregl-ctrl-attrib.maplibregl-compact-show,.maplibregl-ctrl-top-left>.maplibregl-ctrl-attrib.maplibregl-compact-show{border-radius:12px;padding:2px 8px 2px 28px}.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner{display:none}.maplibregl-ctrl-attrib-button{background-color:hsla(0,0%,100%,.5);background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill-rule='evenodd' viewBox='0 0 20 20'%3E%3Cpath d='M4 10a6 6 0 1 0 12 0 6 6 0 1 0-12 0m5-3a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0 3a1 1 0 1 1 2 0v3a1 1 0 1 1-2 0'/%3E%3C/svg%3E");border:0;border-radius:12px;box-sizing:border-box;cursor:pointer;display:none;height:24px;outline:none;position:absolute;right:0;top:0;width:24px}.maplibregl-ctrl-attrib summary.maplibregl-ctrl-attrib-button{-webkit-appearance:none;-moz-appearance:none;appearance:none;list-style:none}.maplibregl-ctrl-attrib summary.maplibregl-ctrl-attrib-button::-webkit-details-marker{display:none}.maplibregl-ctrl-bottom-left .maplibregl-ctrl-attrib-button,.maplibregl-ctrl-top-left .maplibregl-ctrl-attrib-button{left:0}.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button,.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner{display:block}.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button{background-color:rgb(0 0 0/5%)}.maplibregl-ctrl-bottom-right>.maplibregl-ctrl-attrib.maplibregl-compact:after{bottom:0;right:0}.maplibregl-ctrl-top-right>.maplibregl-ctrl-attrib.maplibregl-compact:after{right:0;top:0}.maplibregl-ctrl-top-left>.maplibregl-ctrl-attrib.maplibregl-compact:after{left:0;top:0}.maplibregl-ctrl-bottom-left>.maplibregl-ctrl-attrib.maplibregl-compact:after{bottom:0;left:0}}@media screen and (forced-colors:active){.maplibregl-ctrl-attrib.maplibregl-compact:after{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='%23fff' fill-rule='evenodd' viewBox='0 0 20 20'%3E%3Cpath d='M4 10a6 6 0 1 0 12 0 6 6 0 1 0-12 0m5-3a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0 3a1 1 0 1 1 2 0v3a1 1 0 1 1-2 0'/%3E%3C/svg%3E")}}@media screen and (forced-colors:active) and (prefers-color-scheme:light){.maplibregl-ctrl-attrib.maplibregl-compact:after{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill-rule='evenodd' viewBox='0 0 20 20'%3E%3Cpath d='M4 10a6 6 0 1 0 12 0 6 6 0 1 0-12 0m5-3a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0 3a1 1 0 1 1 2 0v3a1 1 0 1 1-2 0'/%3E%3C/svg%3E")}}.maplibregl-ctrl-attrib a{color:rgba(0,0,0,.75);text-decoration:none}.maplibregl-ctrl-attrib a:hover{color:inherit;text-decoration:underline}.maplibregl-attrib-empty{display:none}.maplibregl-ctrl-scale{background-color:hsla(0,0%,100%,.75);border:2px solid #333;border-top:#333;box-sizing:border-box;color:#333;font-size:10px;padding:0 5px}.maplibregl-popup{display:flex;left:0;pointer-events:none;position:absolute;top:0;will-change:transform}.maplibregl-popup-anchor-top,.maplibregl-popup-anchor-top-left,.maplibregl-popup-anchor-top-right{flex-direction:column}.maplibregl-popup-anchor-bottom,.maplibregl-popup-anchor-bottom-left,.maplibregl-popup-anchor-bottom-right{flex-direction:column-reverse}.maplibregl-popup-anchor-left{flex-direction:row}.maplibregl-popup-anchor-right{flex-direction:row-reverse}.maplibregl-popup-tip{border:10px solid transparent;height:0;width:0;z-index:1}.maplibregl-popup-anchor-top .maplibregl-popup-tip{align-self:center;border-bottom-color:#fff;border-top:none}.maplibregl-popup-anchor-top-left .maplibregl-popup-tip{align-self:flex-start;border-bottom-color:#fff;border-left:none;border-top:none}.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{align-self:flex-end;border-bottom-color:#fff;border-right:none;border-top:none}.maplibregl-popup-anchor-bottom .maplibregl-popup-tip{align-self:center;border-bottom:none;border-top-color:#fff}.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip{align-self:flex-start;border-bottom:none;border-left:none;border-top-color:#fff}.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip{align-self:flex-end;border-bottom:none;border-right:none;border-top-color:#fff}.maplibregl-popup-anchor-left .maplibregl-popup-tip{align-self:center;border-left:none;border-right-color:#fff}.maplibregl-popup-anchor-right .maplibregl-popup-tip{align-self:center;border-left-color:#fff;border-right:none}.maplibregl-popup-close-button{background-color:transparent;border:0;border-radius:0 3px 0 0;cursor:pointer;position:absolute;right:0;top:0}.maplibregl-popup-close-button:hover{background-color:rgb(0 0 0/5%)}.maplibregl-popup-content{background:#fff;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,.1);padding:15px 10px;pointer-events:auto;position:relative}.maplibregl-popup-anchor-top-left .maplibregl-popup-content{border-top-left-radius:0}.maplibregl-popup-anchor-top-right .maplibregl-popup-content{border-top-right-radius:0}.maplibregl-popup-anchor-bottom-left .maplibregl-popup-content{border-bottom-left-radius:0}.maplibregl-popup-anchor-bottom-right .maplibregl-popup-content{border-bottom-right-radius:0}.maplibregl-popup-track-pointer{display:none}.maplibregl-popup-track-pointer *{pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.maplibregl-map:hover .maplibregl-popup-track-pointer{display:flex}.maplibregl-map:active .maplibregl-popup-track-pointer{display:none}.maplibregl-marker{left:0;position:absolute;top:0;transition:opacity .2s;will-change:transform}.maplibregl-user-location-dot,.maplibregl-user-location-dot:before{background-color:#1da1f2;border-radius:50%;height:15px;width:15px}.maplibregl-user-location-dot:before{animation:maplibregl-user-location-dot-pulse 2s infinite;content:"";position:absolute}.maplibregl-user-location-dot:after{border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,.35);box-sizing:border-box;content:"";height:19px;left:-2px;position:absolute;top:-2px;width:19px}@keyframes maplibregl-user-location-dot-pulse{0%{opacity:1;transform:scale(1)}70%{opacity:0;transform:scale(3)}to{opacity:0;transform:scale(1)}}.maplibregl-user-location-dot-stale{background-color:#aaa}.maplibregl-user-location-dot-stale:after{display:none}.maplibregl-user-location-accuracy-circle{background-color:#1da1f233;border-radius:100%;height:1px;width:1px}.maplibregl-crosshair,.maplibregl-crosshair .maplibregl-interactive,.maplibregl-crosshair .maplibregl-interactive:active{cursor:crosshair}.maplibregl-boxzoom{background:#fff;border:2px dotted #202020;height:0;left:0;opacity:.5;position:absolute;top:0;width:0}.maplibregl-cooperative-gesture-screen{align-items:center;background:rgba(0,0,0,.4);color:#fff;display:flex;font-size:1.4em;inset:0;justify-content:center;line-height:1.2;opacity:0;padding:1rem;pointer-events:none;position:absolute;transition:opacity 1s ease 1s;z-index:99999}.maplibregl-cooperative-gesture-screen.maplibregl-show{opacity:1;transition:opacity .05s}.maplibregl-cooperative-gesture-screen .maplibregl-mobile-message{display:none}@media (hover:none),(width <= 480px){.maplibregl-cooperative-gesture-screen .maplibregl-desktop-message{display:none}.maplibregl-cooperative-gesture-screen .maplibregl-mobile-message{display:block}}.maplibregl-pseudo-fullscreen{height:100%!important;left:0!important;position:fixed!important;top:0!important;width:100%!important;z-index:99999}</style>
+
+<div class="app">
+  <aside class="panel" id="panel">
+    <header class="brand">
+      <h1>Sentieri d'<span>autunno</span></h1>
+      <p>Escursioni in Trentino-Alto Adige scelte in base a come sono i boschi adesso, dal satellite.</p>
+      <div class="fresh" id="fresh"><i></i><span>Carico le immagini…</span></div>
+    </header>
+
+    <div id="browse" class="browse" style="display:grid;gap:18px">
+      <section aria-labelledby="want">
+        <div class="label" id="want">Cosa cerchi</div>
+        <div class="presets" id="presets"></div>
+        <div class="weights" id="weights"></div>
+      </section>
+
+      <details class="filters" id="filters">
+        <summary><span>Filtri <span id="nfilters" class="hint"></span></span></summary>
+        <div class="filter-grid">
+          <div>
+            <div class="row"><label for="f-hours">Tempo massimo (solo andata)</label><output id="o-hours"></output></div>
+            <input type="range" id="f-hours" min="1" max="9" step="0.5">
+          </div>
+          <div>
+            <div class="row"><label for="f-up">Dislivello massimo in salita</label><output id="o-up"></output></div>
+            <input type="range" id="f-up" min="200" max="2000" step="100">
+          </div>
+          <div>
+            <div class="label" style="margin-bottom:6px">Difficoltà (scala CAI)</div>
+            <div class="diffs" id="diffs"></div>
+          </div>
+          <div>
+            <div class="label" style="margin-bottom:6px">Parto da</div>
+            <div class="near">
+              <input id="f-near" list="places" placeholder="Paese o città" autocomplete="off">
+              <select id="f-radius" aria-label="Distanza massima">
+                <option value="10">10 km</option><option value="20">20 km</option>
+                <option value="35">35 km</option><option value="50">50 km</option>
+              </select>
+            </div>
+            <datalist id="places"></datalist>
+            <p class="hint">Distanza in linea d'aria dall'inizio del sentiero.</p>
+          </div>
+          <div class="checks">
+            <label><input type="checkbox" id="f-snow"> Evita i sentieri con neve nelle ultime immagini</label>
+            <label><input type="checkbox" id="f-access"> Partenza da parcheggio, funivia o fermata bus</label>
+            <label><input type="checkbox" id="f-family"> Adatti alle famiglie</label>
+            <label><input type="checkbox" id="f-loop"> Solo anelli</label>
+          </div>
+        </div>
+      </details>
+
+      <section aria-live="polite">
+        <div class="results-head"><h2 id="rtitle">Percorsi consigliati</h2><span id="rcount"></span></div>
+        <div class="cards" id="cards"><div class="empty">Carico 4.500 sentieri e le immagini satellitari…</div></div>
+        <button class="more" id="more" hidden>Mostra altri percorsi</button>
+      </section>
+    </div>
+
+    <div id="detail" class="detail" hidden></div>
+
+    <footer class="about">
+      <p><b>Come funziona.</b> Per ogni bosco confrontiamo l'ultima immagine Sentinel-2 senza nuvole con la più verde dell'estate:
+        gli alberi che hanno perso il verde e virato al giallo-arancio, con le foglie ancora sui rami, contano come "in colore".
+        Panorami: quanto è libero l'orizzonte, calcolato sul modello del terreno. Laghi, rifugi e cime vengono da OpenStreetMap.
+        Il punteggio è la media dei criteri con i pesi che scegli; i tratti sotto i 5 km perdono fino al 15%.</p>
+      <p><b>Limiti.</b> È una stima da satellite a 20 m: i colori vanno confermati sul posto, e i pendii ripidi esposti a nord
+        sono in ombra a fine ottobre. Tempi e dislivelli sono calcolati, non misurati. Controlla meteo, aperture dei rifugi e
+        stato dei sentieri prima di partire.</p>
+      <p>Dati: © OpenStreetMap contributors (ODbL), Overture Maps Foundation, Copernicus Sentinel-2 (2026) e Copernicus DEM,
+        ESA WorldCover 2021.</p>
+    </footer>
+  </aside>
+
+  <main class="mapwrap">
+    <div id="map" role="region" aria-label="Mappa dei sentieri"></div>
+    <div class="loading" id="loading">Preparo la mappa…</div>
+    <div class="layers" id="layers">
+      <label><input type="radio" name="bg" value="base" checked> Rilievo</label>
+      <label><input type="radio" name="bg" value="satellite"> <span id="sat-label">Satellite</span></label>
+      <label><input type="checkbox" id="l-foliage" checked> Alberi in colore</label>
+      <label><input type="checkbox" id="l-snow" checked> Neve</label>
+    </div>
+    <div class="legend" id="legend">
+      <div class="label">Alberi in colore</div>
+      <div class="ramp" style="background:linear-gradient(90deg, rgb(242 190 60 / .35), rgb(214 96 24))"></div>
+      <div class="ends"><span>pochi</span><span>bosco pieno</span></div>
+      <div class="label" style="margin-top:3px">Sentiero, punteggio</div>
+      <div class="ramp" style="background:linear-gradient(90deg,#46504c,#6f6236,#d1861b,#c95314,#9e1f10)"></div>
+      <div class="ends"><span>basso</span><span>alto</span></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:2px"><span style="width:14px;height:10px;border-radius:2px;background:#ecf6ff;border:1px solid var(--rule)"></span>neve nelle ultime immagini</div>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+"use strict";
+const KEYS = ["foliage", "panorama", "lakes", "huts"];
+const NAMES = { foliage: "Foliage", panorama: "Panorami", lakes: "Laghi", huts: "Rifugi" };
+const LEVELS = ["Non conta", "Un po'", "Conta", "Molto"];
+const COLORS = () => ({ foliage: css("--larch"), panorama: css("--sky"), lakes: css("--lake"), huts: css("--hut") });
+const PRESETS = {
+  foliage: { label: "Foliage adesso", w: { foliage: 3, panorama: 1, lakes: 0, huts: 0 } },
+  panorama: { label: "Panorami", w: { foliage: 0, panorama: 3, lakes: 1, huts: 0 } },
+  lakes: { label: "Laghi", w: { foliage: 1, panorama: 1, lakes: 3, huts: 0 } },
+  huts: { label: "Rifugi", w: { foliage: 1, panorama: 1, lakes: 0, huts: 3 } },
+  family: { label: "In famiglia", w: { foliage: 2, panorama: 1, lakes: 2, huts: 2 }, family: true },
+};
+const DIFFS = [["T", "T · turistico"], ["E", "E · escursionistico"], ["EE", "EE · esperti"], ["EEA", "EEA · attrezzato"], ["?", "non indicata"]];
+const DIFF_TEXT = { T: "Turistico (T)", E: "Escursionistico (E)", EE: "Per escursionisti esperti (EE)", EEA: "Esperti con attrezzatura (EEA)", "?": "Non indicata" };
+const DEFAULT_DIFF = ["T", "E", "EE", "?"];
+const STORE = "sentieri-autunno-v1";
+const PAGE = 40;
+
+const state = {
+  preset: "foliage", w: { ...PRESETS.foliage.w },
+  f: { hours: 9, up: 2000, diff: [...DEFAULT_DIFF], snow: true, access: false, family: false, loop: false, near: "", radius: 20 },
+  shown: PAGE, sel: null,
+};
+let ROUTES = [], BY_ID = new Map(), POIS = [], PLACES = new Map(), INFO = {}, map = null, mapReady = false, ranked = [];
+let poiMarkers = [], hoverPopup = null, hoverId = null;
+
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+const fmt1 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const fmt0 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 });
+function hours(h) { const m = Math.round(h * 60 / 5) * 5; const hh = Math.floor(m / 60), mm = m % 60; return hh ? `${hh} h${mm ? " " + String(mm).padStart(2, "0") : ""}` : `${mm} min`; }
+function day(iso) { if (!iso) return ""; const d = new Date(iso + "T12:00:00"); return d.toLocaleDateString("it-IT", { day: "numeric", month: "long" }); }
+function pct(x) { return `${Math.round(x * 100)}%`; }
+// DIN 33466, the walking-time rule of the Alpine clubs: 4 km/h on the flat, 300 m/h up, 500 m/h down
+function din(km, up, down) { const h = km / 4, v = up / 300 + down / 500; return Math.max(h, v) + Math.min(h, v) / 2; }
+function range(dates) {
+  if (!dates.length) return "";
+  const a = new Date(dates[0] + "T12:00:00"), b = new Date(dates[dates.length - 1] + "T12:00:00");
+  const month = d => d.toLocaleDateString("it-IT", { month: "long" });
+  if (+a === +b) return `del ${a.getDate()} ${month(a)} ${a.getFullYear()}`;
+  if (a.getMonth() === b.getMonth()) return `dal ${a.getDate()} al ${b.getDate()} ${month(b)} ${b.getFullYear()}`;
+  return `dal ${a.getDate()} ${month(a)} al ${b.getDate()} ${month(b)} ${b.getFullYear()}`;
+}
+
+function loadPrefs() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE) || "null");
+    if (s && s.w && s.f) { state.w = { ...state.w, ...s.w }; state.f = { ...state.f, ...s.f }; state.preset = s.preset ?? null; }
+  } catch (e) { /* storage unavailable: defaults */ }
+}
+function savePrefs() { try { localStorage.setItem(STORE, JSON.stringify({ w: state.w, f: state.f, preset: state.preset })); } catch (e) { } }
+
+function decode(str) {
+  let i = 0, lat = 0, lng = 0; const out = [];
+  while (i < str.length) {
+    for (const which of [0, 1]) {
+      let b, shift = 0, res = 0;
+      do { b = str.charCodeAt(i++) - 63; res |= (b & 31) << shift; shift += 5; } while (b >= 32);
+      const d = (res & 1) ? ~(res >> 1) : (res >> 1);
+      if (which === 0) lat += d; else lng += d;
+    }
+    out.push([lng / 1e5, lat / 1e5]);
+  }
+  return out;
+}
+
+function diffOf(r) {
+  const c = (r.cai || "").toUpperCase();
+  if (c.startsWith("EEA") || c.startsWith("EAI")) return "EEA";
+  if (c.startsWith("EE")) return "EE";
+  if (c.startsWith("E")) return "E";
+  if (c.startsWith("T")) return "T";
+  return "?";
+}
+const GENERIC = /^(wanderweg|sentiero|weg|steig|percorso)\s*(n\.?\s*)?[\w./-]*$/i;
+function title(r) {
+  if (r.name && !GENERIC.test(r.name.trim())) return r.name;
+  if (r.from && r.to) return `${r.from} → ${r.to}`;
+  const goal = goalPoi(r);
+  if (goal) return `${r.ref ? "Sentiero " + r.ref + " · " : ""}${goal[1]}`;
+  return r.ref ? `Sentiero ${r.ref}` : (r.name || "Sentiero senza nome");
+}
+function goalPoi(r) {
+  const order = { rifugio: 0, peak: 1, lake: 2, malga: 3, bivacco: 4 };
+  let best = null;
+  for (const i of r.pi || []) { const p = POIS[i]; if (p && (best === null || order[p[0]] < order[best[0]])) best = p; }
+  return best;
+}
+function subtitle(r) {
+  const parts = [];
+  if (r.ref && !title(r).includes(r.ref)) parts.push(`Sentiero ${r.ref}`);
+  if (r.op) parts.push(r.op.replace(/^Società degli Alpinisti Tridentini$/, "SAT").replace(/Alpenverein Südtirol.*$/, "AVS"));
+  return parts.join(" · ");
+}
+
+function score(r) {
+  let tw = 0, acc = 0;
+  for (const k of KEYS) { tw += state.w[k]; acc += state.w[k] * r.sc[k]; }
+  const base = tw ? acc / tw : (r.sc.foliage + r.sc.panorama + r.sc.lakes + r.sc.huts) / 4;
+  // Short stretches are often link paths rather than outings: up to 15% less below 5 km.
+  return base * (0.85 + 0.15 * Math.min(1, r.km / 5));
+}
+function nearPlace() { return PLACES.get(state.f.near.trim().toLowerCase()) || null; }
+function km(a, b) {
+  const R = 6371, t = Math.PI / 180, dLat = (b[1] - a[1]) * t, dLon = (b[0] - a[0]) * t;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * t) * Math.cos(b[1] * t) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function passes(r, place) {
+  const f = state.f;
+  if (f.hours < 9 && r.h > f.hours) return false;
+  if (f.up < 2000 && r.up > f.up) return false;
+  if (!f.diff.includes(diffOf(r))) return false;
+  if (f.snow && r.snow > 0.15) return false;
+  if (f.access && !r.acc.length) return false;
+  if (f.family && !r.fam) return false;
+  if (f.loop && !r.loop) return false;
+  if (place && km(r.start, place) > f.radius) return false;
+  return true;
+}
+
+function reasons(r, full) {
+  const out = [];
+  const img = day(r.img);
+  if (r.sc.foliage >= 25 && r.fs > 0.04) out.push(`${pct(r.fs)} del percorso tra alberi in colore${full && img ? ` (immagine del ${img})` : ""}`);
+  if (r.pk.length && (full || state.w.panorama)) out.push(`cima ${r.pk[0][0]}${r.pk[0][1] ? ` (${fmt0.format(r.pk[0][1])} m)` : ""}`);
+  else if (r.sc.panorama >= 60 && (full || state.w.panorama)) out.push(full ? `orizzonte libero in ${Math.round(r.open * 16)} direzioni su 16 nel punto migliore` : "tratti con vista aperta");
+  if (r.lk.length) out.push(r.lk.slice(0, 2).join(", "));
+  else if (r.nl) out.push(r.nl === 1 ? "un laghetto" : `${r.nl} laghetti`);
+  if (r.hr.length) out.push(r.hr.slice(0, 2).join(", "));
+  else if (r.hm.length) out.push(r.hm.slice(0, 2).join(", "));
+  else if (r.hb.length) out.push(r.hb[0]);
+  return out;
+}
+
+function markSVG(r) {
+  const sym = (r.sym || "").split(":");
+  const bg = sym[1] || "", fg = sym[2] || "";
+  const ref = (r.ref || sym[3] || "").slice(0, 5);
+  const C = { red: "#cf1f2e", white: "#ffffff", yellow: "#f1c40f", blue: "#1f5fb0", green: "#2d8a3e", black: "#222", orange: "#e57b17", brown: "#7a4a2a", purple: "#7b3fa0" };
+  const size = ref.length > 3 ? 10 : 11.5;
+  if ((bg === "red" || !bg) && /white/.test(fg) || (!r.sym && ref)) {
+    // the red-white-red flag painted on rocks and trees by CAI, SAT and AVS
+    return `<svg viewBox="0 0 46 28" aria-hidden="true"><rect width="46" height="28" rx="3" fill="#cf1f2e"/><rect y="8" width="46" height="12" fill="#fff"/>
+      <text x="23" y="17.6" text-anchor="middle" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="${size}" fill="#111">${esc(ref)}</text></svg>`;
+  }
+  const fill = C[bg] || C[fg.split("_")[0]] || "#5b6b66";
+  const tc = (fill === "#ffffff" || fill === "#f1c40f") ? "#111" : "#fff";
+  return `<svg viewBox="0 0 46 28" aria-hidden="true"><rect width="46" height="28" rx="3" fill="${fill}" stroke="#0003"/>
+    <text x="23" y="18.5" text-anchor="middle" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="${size}" fill="${tc}">${esc(ref || "·")}</text></svg>`;
+}
+
+/* ---------- controls ---------- */
+function buildControls() {
+  const pre = document.getElementById("presets");
+  pre.innerHTML = Object.entries(PRESETS).map(([k, p]) => `<button class="preset" type="button" data-p="${k}" aria-pressed="false">${p.label}</button>`).join("");
+  pre.addEventListener("click", e => {
+    const b = e.target.closest(".preset"); if (!b) return;
+    const p = PRESETS[b.dataset.p];
+    state.preset = b.dataset.p; state.w = { ...p.w }; state.f.family = !!p.family;
+    syncControls(); update();
+  });
+  const wrap = document.getElementById("weights");
+  wrap.innerHTML = KEYS.map(k => `<div class="weight"><label for="w-${k}"><i data-k="${k}"></i>${NAMES[k]}</label>
+    <input type="range" id="w-${k}" min="0" max="3" step="1"><output id="ow-${k}"></output></div>`).join("");
+  for (const k of KEYS) document.getElementById(`w-${k}`).addEventListener("input", e => { state.w[k] = +e.target.value; state.preset = null; syncControls(); update(); });
+  document.getElementById("diffs").innerHTML = DIFFS.map(([v, l]) => `<label><input type="checkbox" value="${v}">${l}</label>`).join("");
+  document.getElementById("diffs").addEventListener("change", () => {
+    state.f.diff = [...document.querySelectorAll("#diffs input:checked")].map(i => i.value); update();
+  });
+  const bind = (id, key, conv = v => v, ev = "input") => document.getElementById(id).addEventListener(ev, e => {
+    state.f[key] = conv(e.target.type === "checkbox" ? e.target.checked : e.target.value); syncControls(); update();
+  });
+  bind("f-hours", "hours", Number); bind("f-up", "up", Number);
+  bind("f-snow", "snow", Boolean, "change"); bind("f-access", "access", Boolean, "change");
+  bind("f-family", "family", Boolean, "change"); bind("f-loop", "loop", Boolean, "change");
+  bind("f-radius", "radius", Number, "change"); bind("f-near", "near", String, "change");
+  document.getElementById("f-near").addEventListener("input", e => { if (!e.target.value) { state.f.near = ""; update(); } });
+  document.getElementById("more").addEventListener("click", () => { state.shown += PAGE; renderList(); paintMap(); });
+  document.getElementById("cards").addEventListener("click", e => { const c = e.target.closest(".card"); if (c) select(+c.dataset.id, true); });
+  document.getElementById("cards").addEventListener("mouseover", e => { const c = e.target.closest(".card"); hover(c ? +c.dataset.id : null); });
+  document.getElementById("cards").addEventListener("mouseleave", () => hover(null));
+}
+function syncControls() {
+  const colors = COLORS();
+  document.querySelectorAll(".preset").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.p === state.preset)));
+  for (const k of KEYS) {
+    document.getElementById(`w-${k}`).value = state.w[k];
+    document.getElementById(`ow-${k}`).textContent = LEVELS[state.w[k]];
+  }
+  document.querySelectorAll(".weight i").forEach(i => i.style.background = colors[i.dataset.k]);
+  const f = state.f;
+  document.getElementById("f-hours").value = f.hours;
+  document.getElementById("o-hours").textContent = f.hours >= 9 ? "qualsiasi" : `fino a ${hours(f.hours)}`;
+  document.getElementById("f-up").value = f.up;
+  document.getElementById("o-up").textContent = f.up >= 2000 ? "qualsiasi" : `fino a ${fmt0.format(f.up)} m`;
+  document.querySelectorAll("#diffs input").forEach(i => i.checked = f.diff.includes(i.value));
+  document.getElementById("f-snow").checked = f.snow; document.getElementById("f-access").checked = f.access;
+  document.getElementById("f-family").checked = f.family; document.getElementById("f-loop").checked = f.loop;
+  document.getElementById("f-radius").value = String(f.radius);
+  const near = document.getElementById("f-near"); if (document.activeElement !== near) near.value = f.near;
+  const diffChanged = f.diff.length !== DEFAULT_DIFF.length || DEFAULT_DIFF.some(d => !f.diff.includes(d));
+  const n = (f.hours < 9) + (f.up < 2000) + diffChanged + f.access + f.family + f.loop + !!nearPlace();
+  document.getElementById("nfilters").textContent = n ? `· ${n} attivi` : "";
+}
+
+/* ---------- ranking and list ---------- */
+let pending = false;
+function update() {
+  if (pending) return; pending = true;
+  requestAnimationFrame(() => { pending = false; savePrefs(); rank(); renderList(); paintMap(); });
+}
+function rank() {
+  const place = nearPlace();
+  ranked = [];
+  for (const r of ROUTES) { r._on = passes(r, place); if (r._on) { r._s = score(r); ranked.push(r); } else r._s = score(r); }
+  ranked.sort((a, b) => b._s - a._s || b.sc.foliage - a.sc.foliage || a.km - b.km);
+  state.shown = Math.max(PAGE, Math.min(state.shown, ranked.length));
+}
+function headline() {
+  const top = KEYS.filter(k => state.w[k] === Math.max(...KEYS.map(x => state.w[x])) && state.w[k] > 0).map(k => NAMES[k].toLowerCase());
+  return top.length ? `ordinati per ${top.join(" e ")}` : "ordinati per punteggio";
+}
+function renderList() {
+  const cards = document.getElementById("cards");
+  const place = nearPlace();
+  document.getElementById("rcount").textContent = `${fmt0.format(ranked.length)} su ${fmt0.format(ROUTES.length)} · ${headline()}`;
+  if (!ranked.length) {
+    cards.innerHTML = `<div class="empty">Nessun sentiero con questi filtri. Prova ad allargare tempo, dislivello o distanza${place ? ` da ${esc(state.f.near)}` : ""}.</div>`;
+    document.getElementById("more").hidden = true; return;
+  }
+  const colors = COLORS();
+  cards.innerHTML = ranked.slice(0, state.shown).map(r => {
+    const why = reasons(r, false);
+    const snow = r.snow > 0.05 ? `<span class="warnchip">neve ${pct(r.snow)}</span>` : "";
+    const dist = place ? ` · ${fmt0.format(km(r.start, place))} km` : "";
+    const bars = KEYS.map(k => `<i style="height:${Math.max(2, r.sc[k] * 0.18)}px;background:${colors[k]};opacity:${state.w[k] ? 1 : .35}"></i>`).join("");
+    return `<button class="card${r.id === state.sel ? " hot" : ""}" data-id="${r.id}" type="button">
+      <span class="mark">${markSVG(r)}</span>
+      <span class="card-main"><span class="card-title">${esc(title(r))}</span>
+        <span class="card-meta">${fmt1.format(r.km)} km · ↑ ${fmt0.format(r.up)} m · ${hours(r.h)} · max ${fmt0.format(r.emax)} m · ${diffOf(r) === "?" ? "diff. n.d." : diffOf(r)}${dist}</span>
+        ${why.length ? `<span class="card-why">${esc(why.join(" · "))}${snow}</span>` : snow ? `<span class="card-why">${snow}</span>` : ""}</span>
+      <span class="card-score"><b>${Math.round(r._s)}</b><span class="bars" aria-hidden="true">${bars}</span></span></button>`;
+  }).join("");
+  document.getElementById("more").hidden = state.shown >= ranked.length;
+}
+
+/* ---------- detail ---------- */
+function niceStep(span) { for (const s of [20, 50, 100, 200, 250, 500, 1000]) if (span / s <= 5) return s; return 1000; }
+function profileSVG(r) {
+  const z = r.pz, n = z.length, W = 360, H = 150, L = 40, R = 10, T = 10, B = 40;
+  const zmin = Math.min(...z), zmax = Math.max(...z);
+  const step = niceStep(Math.max(zmax - zmin, 60));
+  const lo = Math.floor(zmin / step) * step, hi = Math.max(Math.ceil(zmax / step) * step, lo + step);
+  const x = i => L + (W - L - R) * i / (n - 1), y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  const line = z.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const area = `${line}L${x(n - 1).toFixed(1)},${y(lo).toFixed(1)}L${x(0).toFixed(1)},${y(lo).toFixed(1)}Z`;
+  let grid = "";
+  for (let v = lo; v <= hi + 1e-6; v += step) grid += `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--rule)" stroke-width="1"/><text class="axis" x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${fmt0.format(v)}</text>`;
+  const cw = (W - L - R) / n, sy = H - B + 8;
+  const strip = [...r.pf].map((d, i) => `<rect x="${(L + i * cw).toFixed(1)}" y="${sy}" width="${(cw + 0.4).toFixed(1)}" height="9" fill="${+d ? "var(--larch)" : "var(--chip)"}" fill-opacity="${+d ? (0.25 + 0.75 * d / 9).toFixed(2) : 1}"/>`).join("");
+  const ticks = [0, 0.5, 1].map(t => `<text class="axis" x="${(L + (W - L - R) * t).toFixed(1)}" y="${H - 6}" text-anchor="${t === 0 ? "start" : t === 1 ? "end" : "middle"}">${fmt1.format(r.km * t)} km</text>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Profilo altimetrico da ${fmt0.format(zmin)} a ${fmt0.format(zmax)} metri, con la fascia degli alberi in colore lungo il percorso">
+    ${grid}<path d="${area}" fill="var(--chip)"/><path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/>
+    <text class="axis" x="${L}" y="${sy - 3}">alberi in colore lungo il percorso</text>${strip}${ticks}</svg>`;
+}
+function renderDetail(r) {
+  const el = document.getElementById("detail");
+  const colors = COLORS();
+  const d = diffOf(r);
+  const why = [];
+  if (r.fs > 0.04) why.push(`Il ${pct(r.fs)} del percorso passa tra alberi che hanno cambiato colore rispetto all'estate (immagini del ${day(r.img)}).`);
+  else if (r.dec > 0.1) why.push(`Attraversa boschi che in autunno cambiano colore, ma nelle immagini del ${day(r.img)} il colore è poco visibile: foglie ancora verdi o già cadute.`);
+  else why.push("Poco bosco che cambia colore lungo il percorso: per lo più conifere sempreverdi, prati o roccia.");
+  if (r.pk.length) why.push(`Tocca ${r.pk.map(p => `${p[0]}${p[1] ? ` (${fmt0.format(p[1])} m)` : ""}`).slice(0, 3).join(", ")}.`);
+  if (r.open >= 0.5) why.push(`Nel punto più aperto l'orizzonte è libero in ${Math.round(r.open * 16)} direzioni su 16.`);
+  else if (r.open < 0.2) why.push("Percorso per lo più chiuso: poche viste lontane.");
+  if (r.lk.length || r.nl) why.push(r.lk.length ? `Passa vicino a ${r.lk.join(", ")}.` : `Passa vicino a ${r.nl === 1 ? "un laghetto" : r.nl + " laghetti"} senza nome.`);
+  const huts = [...r.hr.map(n => n), ...r.hm, ...r.hb];
+  if (huts.length) why.push(`Punti d'appoggio: ${huts.slice(0, 4).join(", ")}.`);
+  if (r.acc.length) why.push(`Vicino a un estremo c'è ${r.acc.map(a => ({ parking: "un parcheggio", cablecar: "una funivia", bus: "una fermata bus" }[a])).join(", ")}.`);
+  const warn = [];
+  if (r.snow > 0.05) warn.push(`Neve su circa il ${pct(r.snow)} del percorso nelle ultime immagini.`);
+  if (r.known < 0.7) warn.push(`Solo il ${pct(r.known)} del percorso ha immagini chiare recenti: la stima del foliage è meno affidabile.`);
+  if (r.complete < 0.95) warn.push("La traccia in OpenStreetMap è incompleta: alcuni tratti mancano.");
+  const along = [];
+  if (r.hr.length) along.push(["Rifugi", r.hr.join(", ")]);
+  if (r.hm.length) along.push(["Malghe", r.hm.join(", ")]);
+  if (r.hb.length) along.push(["Bivacchi", r.hb.join(", ")]);
+  if (r.lk.length) along.push(["Laghi", r.lk.join(", ")]);
+  if (r.pk.length) along.push(["Cime", r.pk.map(p => p[0]).join(", ")]);
+  el.innerHTML = `
+    <button class="back" type="button" id="back">← Tutti i percorsi</button>
+    <div class="d-head"><span class="mark">${markSVG(r)}</span><div><h2>${esc(title(r))}</h2>
+      <p>${esc([subtitle(r), DIFF_TEXT[d]].filter(Boolean).join(" · "))}</p></div></div>
+    <div class="stats">
+      <div class="stat"><b>${fmt1.format(r.km)} km</b><span>${r.loop ? "anello" : "solo andata"}</span></div>
+      <div class="stat"><b>↑ ${fmt0.format(r.up)} m</b><span>↓ ${fmt0.format(r.down)} m</span></div>
+      <div class="stat"><b>${hours(r.h)}</b><span>${r.loop ? "giro completo" : `andata e ritorno ${hours(r.h + din(r.km, r.down, r.up))}`}</span></div>
+      <div class="stat"><b>${fmt0.format(r.emax)} m</b><span>quota max · min ${fmt0.format(r.emin)}</span></div>
+    </div>
+    <div class="scores">${KEYS.map(k => `<div class="score"><span>${NAMES[k]}</span><b>${r.sc[k]}</b><div class="meter"><i style="width:${r.sc[k]}%;background:${colors[k]}"></i></div></div>`).join("")}</div>
+    <div class="profile">${profileSVG(r)}</div>
+    <section><div class="label">Perché te lo proponiamo</div><ul class="why">${why.map(w => `<li>${esc(w)}</li>`).join("")}</ul></section>
+    ${warn.length ? `<p class="caveat">${warn.map(esc).join(" ")}</p>` : ""}
+    ${along.length ? `<section><div class="label">Lungo il percorso</div><dl class="along">${along.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl></section>` : ""}
+    ${r.from || r.to ? `<p class="hint">Cartelli: da ${esc(r.from || "?")} a ${esc(r.to || "?")}.</p>` : ""}
+    <div class="links">
+      <a href="https://hiking.waymarkedtrails.org/#route?id=${r.id}" target="_blank" rel="noopener">Traccia GPX su Waymarked Trails</a>
+      <a href="https://www.openstreetmap.org/relation/${r.id}" target="_blank" rel="noopener">Vedi su OpenStreetMap</a>
+      ${r.web && /^https?:\/\//.test(r.web) ? `<a href="${esc(r.web)}" target="_blank" rel="noopener">Sito del sentiero</a>` : ""}
+    </div>
+    <p class="hint">Tempo calcolato con la regola DIN 33466 dei club alpini (4 km/h in piano, 300 m/h in salita, 500 m/h in discesa), soste escluse.</p>`;
+  document.getElementById("back").addEventListener("click", () => select(null));
+}
+function select(id, fly) {
+  state.sel = id;
+  const r = id != null ? BY_ID.get(id) : null;
+  document.getElementById("browse").hidden = !!r;
+  document.getElementById("detail").hidden = !r;
+  if (r) { renderDetail(r); document.getElementById("panel").scrollTop = 0; if (matchMedia("(max-width: 860px)").matches) window.scrollTo({ top: 0, behavior: "smooth" }); }
+  else renderList();
+  if (mapReady) {
+    map.setFilter("sel-casing", ["==", ["id"], id ?? -1]);
+    map.setFilter("sel-line", ["==", ["id"], id ?? -1]);
+    showPois(r);
+    if (r && fly) fitRoute(r);
+  }
+}
+
+/* ---------- map ---------- */
+function isDark() {
+  const t = document.documentElement.getAttribute("data-theme");
+  return t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+}
+function themeMap() {
+  if (!mapReady) return;
+  const dark = isDark();
+  map.setPaintProperty("bg", "background-color", css("--paper"));
+  for (const id of ["base", "satellite"]) {
+    map.setPaintProperty(id, "raster-brightness-max", dark ? 0.74 : 1);
+    map.setPaintProperty(id, "raster-saturation", dark ? -0.2 : 0);
+  }
+  map.setPaintProperty("sel-casing", "line-color", dark ? "#111715" : "#ffffff");
+  map.setPaintProperty("sel-line", "line-color", css("--trail"));
+}
+function initMap(images) {
+  const abs = p => new URL(p, document.baseURI).href;
+  const b = INFO.bbox;
+  map = new maplibregl.Map({
+    container: "map", attributionControl: false, maxZoom: 15, minZoom: 7,
+    bounds: [[10.38, 45.66], [12.48, 47.09]], fitBoundsOptions: { padding: 16 },
+    maxBounds: [[b[0] - 0.6, b[1] - 0.4], [b[2] + 0.6, b[3] + 0.4]],
+    style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": css("--paper") } }] },
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
+  map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap contributors · Overture Maps · Copernicus Sentinel-2 2026, Copernicus DEM · ESA WorldCover" }), "bottom-right");
+  map.once("idle", () => document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"));
+  map.on("load", () => {
+    const coords = images.corners;
+    for (const [id, file, vis, op] of [["base", "base.webp", "visible", 1], ["satellite", "satellite.webp", "none", 1], ["foliage", "foliage.webp", "visible", 0.78], ["snow", "snow.webp", "visible", 0.85]]) {
+      map.addSource(id, { type: "image", url: abs("data/" + file), coordinates: coords });
+      map.addLayer({ id, type: "raster", source: id, layout: { visibility: vis }, paint: { "raster-opacity": op, "raster-fade-duration": 0 } });
+    }
+    const features = ROUTES.map(r => ({ type: "Feature", id: r.id, properties: {}, geometry: r.g.length === 1 ? { type: "LineString", coordinates: decode(r.g[0]) } : { type: "MultiLineString", coordinates: r.g.map(decode) } }));
+    ROUTES.forEach((r, i) => r._bbox = bboxOf(features[i].geometry));
+    map.addSource("routes", { type: "geojson", data: { type: "FeatureCollection", features }, tolerance: 0.5 });
+    const sc = ["coalesce", ["feature-state", "s"], 0];
+    map.addLayer({ id: "routes", type: "line", source: "routes", layout: { "line-cap": "round", "line-join": "round" }, paint: {
+      "line-color": ["interpolate", ["linear"], sc, 0, "#46504c", 35, "#6f6236", 55, "#d1861b", 75, "#c95314", 92, "#9e1f10"],
+      "line-opacity": ["case", ["boolean", ["feature-state", "on"], true], ["case", ["boolean", ["feature-state", "top"], false], 1, 0.75], 0.14],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 7, ["case", ["boolean", ["feature-state", "top"], false], 2.4, 0.7], 10, ["case", ["boolean", ["feature-state", "top"], false], 3.4, 1.3], 13, ["case", ["boolean", ["feature-state", "top"], false], 5.5, 2.6]],
+    } });
+    map.addLayer({ id: "hover", type: "line", source: "routes", filter: ["==", ["id"], -1], layout: { "line-cap": "round" }, paint: { "line-color": css("--trail"), "line-width": 4, "line-opacity": 0.8 } });
+    map.addLayer({ id: "sel-casing", type: "line", source: "routes", filter: ["==", ["id"], -1], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 5, 14, 10] } });
+    map.addLayer({ id: "sel-line", type: "line", source: "routes", filter: ["==", ["id"], -1], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": css("--trail"), "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 14, 5] } });
+    map.addLayer({ id: "hit", type: "line", source: "routes", paint: { "line-color": "#000", "line-opacity": 0, "line-width": 12 } });
+    hoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
+    map.on("mousemove", "hit", e => {
+      const f = pickRoute(e.features); if (!f) return;
+      map.getCanvas().style.cursor = "pointer";
+      const r = BY_ID.get(f.id);
+      hover(r.id, true);
+      hoverPopup.setLngLat(e.lngLat).setHTML(`<b>${esc(title(r))}</b><br>${Math.round(r._s)} punti · ${fmt1.format(r.km)} km · ↑ ${fmt0.format(r.up)} m`).addTo(map);
+    });
+    map.on("mouseleave", "hit", () => { map.getCanvas().style.cursor = ""; hoverPopup.remove(); hover(null, true); });
+    map.on("click", "hit", e => { const f = pickRoute(e.features); if (f) select(f.id, false); });
+    addTowns();
+    document.querySelectorAll('input[name="bg"]').forEach(i => i.addEventListener("change", () =>
+      map.setLayoutProperty("satellite", "visibility", document.querySelector('input[name="bg"]:checked').value === "satellite" ? "visible" : "none")));
+    for (const id of ["foliage", "snow"]) document.getElementById(`l-${id}`).addEventListener("change", e => map.setLayoutProperty(id, "visibility", e.target.checked ? "visible" : "none"));
+    mapReady = true;
+    document.getElementById("loading").hidden = true;
+    themeMap(); paintMap();
+    if (state.sel != null) select(state.sel, true);
+  });
+}
+function pickRoute(features) {
+  let best = null;
+  for (const f of features || []) { const r = BY_ID.get(f.id); if (r && r._on && (!best || r._s > BY_ID.get(best.id)._s)) best = f; }
+  return best || (features && features[0]) || null;
+}
+function bboxOf(g) {
+  const pts = g.type === "LineString" ? g.coordinates : g.coordinates.flat();
+  let a = 180, b = 90, c = -180, d = -90;
+  for (const [x, y] of pts) { if (x < a) a = x; if (y < b) b = y; if (x > c) c = x; if (y > d) d = y; }
+  return [[a, b], [c, d]];
+}
+function fitRoute(r) {
+  const small = matchMedia("(max-width: 860px)").matches;
+  map.fitBounds(r._bbox, { padding: small ? 40 : { top: 60, bottom: 60, left: 60, right: 200 }, maxZoom: 13.3, duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 700 });
+}
+function paintMap() {
+  if (!mapReady) return;
+  const top = new Set(ranked.slice(0, state.shown).map(r => r.id));
+  for (const r of ROUTES) map.setFeatureState({ source: "routes", id: r.id }, { s: r._s, on: r._on, top: top.has(r.id) });
+}
+function hover(id, fromMap) {
+  if (hoverId === id) return;
+  hoverId = id;
+  if (mapReady) map.setFilter("hover", ["==", ["id"], id ?? -1]);
+  if (fromMap) document.querySelectorAll(".card.hot").forEach(c => { if (+c.dataset.id !== state.sel) c.classList.remove("hot"); });
+  if (fromMap && id != null) { const c = document.querySelector(`.card[data-id="${id}"]`); if (c) c.classList.add("hot"); }
+}
+function showPois(r) {
+  poiMarkers.forEach(m => m.remove()); poiMarkers = [];
+  if (!r) return;
+  for (const i of (r.pi || []).slice(0, 18)) {
+    const p = POIS[i]; if (!p) continue;
+    const el = document.createElement("div");
+    el.className = `poi ${p[0]}`;
+    el.innerHTML = `<i></i><span>${esc(p[1])}${p[4] && p[0] === "peak" ? ` ${fmt0.format(p[4])}` : ""}</span>`;
+    poiMarkers.push(new maplibregl.Marker({ element: el, anchor: "left", offset: [-5, 0] }).setLngLat([p[2], p[3]]).addTo(map));
+  }
+}
+function addTowns() {
+  const towns = (INFO.towns || []).slice(0, matchMedia("(max-width: 860px)").matches ? 9 : 40);  // largest first
+  for (const [name, lon, lat] of towns) {
+    const el = document.createElement("div"); el.className = "town"; el.textContent = name;
+    new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map);
+  }
+}
+
+/* ---------- boot ---------- */
+async function boot() {
+  loadPrefs(); buildControls(); syncControls();
+  try {
+    const [rd, pois, images] = await Promise.all(["data/routes.json", "data/pois.json", "data/images.json"].map(p => fetch(p).then(x => { if (!x.ok) throw new Error(p); return x.json(); })));
+    INFO = rd; ROUTES = rd.routes; POIS = pois;
+    for (const r of ROUTES) BY_ID.set(r.id, r);
+    for (const [name, lon, lat] of rd.places || []) PLACES.set(name.toLowerCase(), [lon, lat]);
+    document.getElementById("places").innerHTML = (rd.places || []).map(p => `<option value="${esc(p[0])}"></option>`).join("");
+    const dates = (rd.image_dates || []).slice().sort();
+    document.querySelector("#fresh span").textContent = dates.length ? `Immagini Sentinel-2 ${range(dates)}` : "Immagini satellitari recenti";
+    if (dates.length) document.getElementById("sat-label").textContent = `Satellite, ${new Date(dates[dates.length - 1] + "T12:00:00").toLocaleDateString("it-IT", { month: "short", year: "numeric" })}`;
+    rank(); renderList(); syncControls();
+    if (typeof maplibregl === "undefined") throw new Error("maplibre");
+    initMap(images);
+  } catch (e) {
+    const msg = e.message === "maplibre" ? "La mappa non si è caricata: controlla la connessione e ricarica la pagina." : "Non riesco a caricare i dati dei sentieri. Ricarica la pagina.";
+    document.getElementById("loading").textContent = msg;
+    if (!ROUTES.length) document.getElementById("cards").innerHTML = `<div class="empty">${msg}</div>`;
+  }
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { themeMap(); syncControls(); renderList(); });
+new MutationObserver(() => { themeMap(); syncControls(); if (state.sel == null) renderList(); else renderDetail(BY_ID.get(state.sel)); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+boot();
+</script>
