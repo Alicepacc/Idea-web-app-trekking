@@ -4,6 +4,7 @@ Source: Copernicus DEM GLO-30 (30 m surface model) on AWS.
 
 Writes to data/work/:
   dem20.tif     elevation on the shared 20 m UTM grid (profiles, hillshade)
+  dem100.tif    elevation at 100 m, 30 km past the region (views, panoramas)
   horizon.tif   for every 100 m cell, the elevation angle of the horizon in 16
                 directions (degrees). Low angles mean an open, far-reaching view:
                 summits and ridges score well, valley floors and forests badly.
@@ -93,6 +94,7 @@ def main():
     ph = int((height * -transform.e + 2 * pad) // PANO_RES)
     ptransform = from_origin(x0, y1, PANO_RES, PANO_RES)
     z = warp_dem(pano_bbox, ptransform, pw, ph)
+    save(WORK / "dem100.tif", z, ptransform, nodata=np.nan)
     hor = horizon_angles(z, PANO_RES)
     save(WORK / "horizon.tif", hor, ptransform, nodata=np.nan)
     print(f"horizon.tif {pw}x{ph}x{AZIMUTHS}, mean horizon {np.nanmean(hor):.1f} deg")

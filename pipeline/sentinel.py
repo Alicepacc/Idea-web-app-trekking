@@ -10,6 +10,7 @@ Two composites are built from the six 100 km tiles covering the region:
 
 Writes to data/work/:
   s2_now.tif       B02 B03 B04 B06 B8A, reflectance x 10000 (int16)
+  s2_now_rgb10.tif B04 B03 B02 at 10 m, same dates as s2_now (for the map)
   s2_now_meta.tif  1: quality (2 sunlit, 1 terrain shadow, 0 no data)
                    2: observation date (days since 2000-01-01)  3: SCL class
   s2_summer.tif    B02 B03 B04 B06 B8A of the greenest summer observation
@@ -30,7 +31,9 @@ import numpy as np
 import rasterio
 import rasterio.errors
 from rasterio.enums import Resampling
+from rasterio.transform import from_origin
 from rasterio.warp import reproject
+from rasterio.windows import Window
 from scipy.ndimage import maximum_filter
 
 from common import UTM, WORK, gdal_env, grid
@@ -38,6 +41,7 @@ from common import UTM, WORK, gdal_env, grid
 TILES = ["32TPR", "32TQR", "32TPS", "32TQS", "32TPT", "32TQT"]
 BUCKET = "https://sentinel-cogs.s3.us-west-2.amazonaws.com"
 BANDS = ["B02", "B03", "B04", "B06", "B8A"]
+RGB10 = ["B04", "B03", "B02"]  # true colour at the native 10 m, for the map
 BOA_OFFSET = 1000  # baseline >= 04.00 stores reflectance * 10000 + 1000, unless the archive removed it
 SUNLIT = (4, 5, 6, 11)  # vegetation, bare, water, snow
 SHADOW = (2,)  # dark area: mostly terrain shadow when the sun is low
@@ -149,6 +153,32 @@ def read_bands(sc, tsl):
     return np.clip(np.stack(arrs).astype(np.int32) - sc["offset"], -32000, 32000).astype(np.int16)
 
 
+def read_rgb10(sc, tsl, take, attempts=4):
+    """True-colour bands at 10 m, only over the bounding box of what this scene contributes."""
+    rows, cols = np.flatnonzero(take.any(axis=1)), np.flatnonzero(take.any(axis=0))
+    r0, r1, c0, c1 = rows[0], rows[-1] + 1, cols[0], cols[-1] + 1
+    win = Window(2 * (tsl[1].start + c0), 2 * (tsl[0].start + r0), 2 * (c1 - c0), 2 * (r1 - r0))
+
+    def one(band):
+        for attempt in range(attempts):
+            try:
+                with rasterio.Env(**gdal_env()), rasterio.open(f"/vsicurl/{sc['base']}{band}.tif") as ds:
+                    return ds.read(1, window=win)
+            except rasterio.errors.RasterioIOError:
+                if attempt == attempts - 1:
+                    raise
+                time.sleep(2 ** attempt)
+
+    with ThreadPoolExecutor(len(RGB10)) as ex:
+        arrs = list(ex.map(one, RGB10))
+    out = np.empty((len(arrs),) + arrs[0].shape, np.int16)
+    for k, a in enumerate(arrs):  # stays in 16 bits: a full tile is 0.7 GB per scene
+        np.minimum(a, 32000, out=a)
+        out[k] = a.astype(np.int16) - sc["offset"]
+        np.maximum(out[k], 0, out=out[k])
+    return (r0, r1, c0, c1), out
+
+
 def with_scl(items, grid_args, tree=None):
     with ThreadPoolExecutor(8) as ex:
         scls = list(ex.map(lambda s: read_scl(s, grid_args, tree), items))
@@ -174,6 +204,7 @@ def composite_now(items, gtransform, gw, gh, tree):
             continue
         q[take] = np.where(sunlit, 2, 1)[take]
         plan.append((sc, gsl, tsl, scl, take))
+    del scenes_scl  # only the planned scenes are kept
 
     bands = np.zeros((len(BANDS), gh, gw), np.int16)
     quality[:] = 0
@@ -186,7 +217,24 @@ def composite_now(items, gtransform, gw, gh, tree):
             quality[gsl][take] = np.where(np.isin(scl, SUNLIT), 2, 1).astype(np.uint8)[take]
             when[gsl][take] = (sc["date"] - EPOCH).days
             scl_out[gsl][take] = scl[take]
-    return bands, quality, when, scl_out
+    # keep only what the 10 m pass needs, with the masks packed to bits
+    plan = [(sc, gsl, tsl, np.packbits(take), take.shape) for sc, gsl, tsl, scl, take in plan]
+    return bands, quality, when, scl_out, plan
+
+
+def composite_rgb10(plan, gw, gh):
+    """The same choice of date per pixel, at 10 m, for a sharp true-colour map."""
+    rgb10 = np.zeros((len(RGB10), 2 * gh, 2 * gw), np.int16)
+    for sc, gsl, tsl, packed, shape in plan:
+        take = np.unpackbits(packed, count=shape[0] * shape[1]).reshape(shape).astype(bool)
+        (r0, r1, c0, c1), b = read_rgb10(sc, tsl, take)
+        m10 = np.repeat(np.repeat(take[r0:r1, c0:c1], 2, axis=0), 2, axis=1)
+        y0, x0 = 2 * (gsl[0].start + r0), 2 * (gsl[1].start + c0)
+        target = rgb10[:, y0:y0 + m10.shape[0], x0:x0 + m10.shape[1]]
+        for k in range(len(RGB10)):
+            target[k][m10] = b[k][m10]
+        del b, m10, take
+    return rgb10
 
 
 def composite_summer(items, gtransform, gw, gh, per_tile=6):
@@ -257,8 +305,9 @@ def main():
 def composite_now_step(start, end, gtransform, gw, gh, tree):
     print(f"now: {start} .. {end}")
     items = [s for t in TILES for s in scenes(t, start, end, max_cloud=95)]
-    bands, quality, when, scl = composite_now(items, gtransform, gw, gh, tree)
+    bands, quality, when, scl, plan = composite_now(items, gtransform, gw, gh, tree)
     save(WORK / "s2_now.tif", bands, gtransform)
+    del bands
     save(WORK / "s2_now_meta.tif", np.stack([quality.astype(np.uint16), when, scl.astype(np.uint16)]), gtransform)
     print(f"now: sunlit {np.mean(quality == 2):.1%}, shadow {np.mean(quality == 1):.1%}, "
           f"missing {np.mean(quality == 0):.1%}")
@@ -267,6 +316,8 @@ def composite_now_step(start, end, gtransform, gw, gh, tree):
     (WORK / "composite_info.json").write_text(json.dumps({
         "window": [start.isoformat(), end.isoformat()], "image_dates": used,
         "sunlit_share": round(float(np.mean(quality == 2)), 3)}))
+    del quality, when, scl
+    save(WORK / "s2_now_rgb10.tif", composite_rgb10(plan, gw, gh), from_origin(gtransform.c, gtransform.f, 10, 10))
 
 
 if __name__ == "__main__":

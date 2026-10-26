@@ -1,0 +1,826 @@
+<title>Sentieri d'autunno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: a guidebook column on the left, the map takes the rest of the screen; on phones the map sits on top. */
+:root {
+  --paper: #eef1ec;
+  --panel: #f8f9f6;
+  --ink: #1b2824;
+  --ink-2: #52605b;
+  --rule: #d6ddd7;
+  --chip: #e6ebe5;
+  --larch: #c07311;
+  --larch-soft: #f4e2c0;
+  --trail: #c4162a;
+  --lake: #286f98;
+  --sky: #5566ad;
+  --hut: #7d5133;
+  --good: #2f7a4f;
+  --good-soft: #dcefe2;
+  --warn: #9a5b00;
+  --warn-soft: #fbecd2;
+  --bad: #a83232;
+  --bad-soft: #f8dede;
+  --focus: #1f6feb;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Barlow", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111715; --panel: #161e1b; --ink: #e2e9e5; --ink-2: #a3b0aa; --rule: #2b3732; --chip: #212b27;
+    --larch: #e8a43c; --larch-soft: #3a2d18; --trail: #ef5b69; --lake: #73b6dc; --sky: #9eabea; --hut: #d4a37c;
+    --good: #6fca93; --good-soft: #17301f; --warn: #f0b356; --warn-soft: #3a2a12; --bad: #f08a8a; --bad-soft: #3a1b1b;
+    --focus: #79a8ff; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111715; --panel: #161e1b; --ink: #e2e9e5; --ink-2: #a3b0aa; --rule: #2b3732; --chip: #212b27;
+  --larch: #e8a43c; --larch-soft: #3a2d18; --trail: #ef5b69; --lake: #73b6dc; --sky: #9eabea; --hut: #d4a37c;
+  --good: #6fca93; --good-soft: #17301f; --warn: #f0b356; --warn-soft: #3a2a12; --bad: #f08a8a; --bad-soft: #3a1b1b;
+  --focus: #79a8ff; color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.45 var(--font-body); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.app { display: grid; grid-template-columns: minmax(340px, 440px) 1fr; height: 100%; }
+.panel { overflow-y: auto; background: var(--panel); border-right: 1px solid var(--rule);
+  padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: 20px; padding-block: 18px 28px;
+  display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.mapwrap { position: relative; min-width: 0; background: var(--paper); }
+#map { position: absolute; inset: 0; }
+
+.brand { display: grid; gap: 4px; }
+.brand h1 { margin: 0; font: 700 30px/1 var(--font-display); letter-spacing: .01em; text-wrap: balance; }
+.brand h1 span { color: var(--larch); }
+.brand p { margin: 0; color: var(--ink-2); font-size: 14px; }
+.fresh { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font-size: 13px; color: var(--ink-2); }
+.fresh span { display: inline-flex; align-items: center; gap: 6px; }
+.fresh i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.label { font: 600 12px/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+section { display: grid; gap: 10px; min-width: 0; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--rule); background: transparent; border-radius: 999px; padding: 5px 12px; cursor: pointer; font-weight: 500; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+
+.weights { display: grid; gap: 8px; }
+.weight { display: grid; grid-template-columns: 86px 1fr 84px; align-items: center; gap: 10px; }
+.weight label { font-weight: 600; display: flex; align-items: center; gap: 7px; }
+.weight label i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.weight output { font-size: 13px; color: var(--ink-2); text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--ink); }
+
+details.filters { border: 1px solid var(--rule); border-radius: var(--r); padding: 0 14px; }
+details.filters > summary { cursor: pointer; padding: 11px 0; list-style: none; display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+details.filters > summary::-webkit-details-marker { display: none; }
+details.filters > summary::after { content: "+"; font: 600 18px/1 var(--font-display); color: var(--ink-2); }
+details.filters[open] > summary::after { content: "–"; }
+.filter-grid { display: grid; gap: 14px; padding-bottom: 14px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.row output { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-2); }
+.diffs { display: flex; flex-wrap: wrap; gap: 6px; }
+.diffs label, .checks label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.diffs label { border: 1px solid var(--rule); border-radius: 6px; padding: 3px 8px; font-size: 13px; }
+.diffs input, .checks input { accent-color: var(--ink); }
+.checks { display: grid; gap: 7px; font-size: 14px; }
+.checks input { width: 16px; height: 16px; }
+.near { display: grid; grid-template-columns: 1fr 92px; gap: 8px; }
+.near input, .near select { border: 1px solid var(--rule); border-radius: 8px; background: var(--panel); padding: 7px 9px; min-width: 0; }
+.hint { font-size: 12.5px; color: var(--ink-2); margin: 0; }
+
+.results-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.results-head h2 { margin: 0; font: 600 20px/1.1 var(--font-display); }
+.results-head span { font-size: 13px; color: var(--ink-2); }
+.cards { display: grid; border-top: 1px solid var(--rule); }
+.card { display: grid; grid-template-columns: 40px 1fr 44px; gap: 11px; align-items: start; text-align: left; width: 100%;
+  border: 0; border-bottom: 1px solid var(--rule); background: transparent; padding: 11px 2px; cursor: pointer; }
+.card:hover, .card.hot { background: color-mix(in srgb, var(--larch-soft) 45%, transparent); }
+.card-main { display: grid; gap: 3px; min-width: 0; }
+.card-title { font: 600 16.5px/1.2 var(--font-display); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-sub { font-size: 13px; color: var(--ink-2); }
+.card-meta { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.card-why { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-score { display: grid; justify-items: end; gap: 5px; }
+.card-score b { font: 700 22px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.bars { display: grid; grid-template-columns: repeat(4, 7px); gap: 2px; align-items: end; height: 18px; }
+.bars i { display: block; border-radius: 1px; min-height: 2px; }
+.glyph { width: 40px; height: 40px; border-radius: 8px; background: var(--chip); color: var(--ink); display: grid; place-items: center; }
+.glyph svg { width: 24px; height: 24px; }
+.more { border: 1px solid var(--rule); background: transparent; border-radius: 8px; padding: 8px; cursor: pointer; font-weight: 600; }
+.empty { padding: 14px; border: 1px dashed var(--rule); border-radius: var(--r); color: var(--ink-2); }
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; border-radius: 4px; padding: 0 6px; line-height: 1.6; white-space: nowrap; }
+.pill.good { color: var(--good); background: var(--good-soft); }
+.pill.fair { color: var(--warn); background: var(--warn-soft); }
+.pill.bad { color: var(--bad); background: var(--bad-soft); }
+.pill.snow { color: var(--lake); background: color-mix(in srgb, var(--lake) 14%, transparent); }
+.pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+
+.detail { display: grid; gap: 16px; }
+.back { justify-self: start; border: 0; background: transparent; padding: 0; color: var(--ink-2); cursor: pointer; font-weight: 600; }
+.d-head { display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: start; }
+.d-head h2 { margin: 0; font: 700 25px/1.08 var(--font-display); text-wrap: balance; }
+.d-head p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; }
+.photo { margin: 0; display: grid; gap: 6px; }
+.photo img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: var(--r); background: var(--chip); }
+.photo figcaption { font-size: 12px; color: var(--ink-2); }
+.photo figcaption a { color: inherit; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.stat { display: grid; gap: 2px; }
+.stat b { font: 600 19px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--ink-2); }
+.scores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.score { display: grid; gap: 5px; }
+.score span { font-size: 12px; color: var(--ink-2); }
+.score b { font: 700 20px/1 var(--font-display); }
+.meter { height: 5px; background: var(--chip); border-radius: 3px; overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 3px; }
+.wx { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.wx-day { border: 1px solid var(--rule); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 4px; }
+.wx-day.sel { border-color: var(--ink); }
+.wx-day h3 { margin: 0; font: 600 15px/1.1 var(--font-display); text-transform: capitalize; }
+.wx-day b { font: 600 17px/1.15 var(--font-display); }
+.wx-day dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; font-size: 12.5px; }
+.wx-day dt { color: var(--ink-2); }
+.wx-day dd { margin: 0; font-variant-numeric: tabular-nums; }
+.pano { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--r); background: color-mix(in srgb, var(--sky) 7%, var(--panel)); }
+.pano svg { display: block; height: 210px; width: 1080px; }
+.pano .lbl { fill: var(--ink); font: 600 11px var(--font-body); }
+.pano .ax { fill: var(--ink-2); font: 600 11px var(--font-display); letter-spacing: .06em; }
+.profile svg { width: 100%; height: auto; display: block; }
+.profile .axis { fill: var(--ink-2); font: 11px var(--font-body); }
+.why { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.why li::marker { color: var(--larch); }
+.along { display: grid; gap: 6px; font-size: 14px; margin: 0; }
+.along div { display: grid; grid-template-columns: 82px 1fr; gap: 8px; }
+.along dt { color: var(--ink-2); font-size: 13px; }
+.along dd { margin: 0; }
+.cams { display: grid; gap: 6px; font-size: 14px; }
+.cams a { color: var(--ink); text-underline-offset: 3px; }
+.caveat { font-size: 13px; color: var(--ink-2); border-left: 3px solid var(--larch); padding: 2px 0 2px 10px; margin: 0; }
+.links { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; }
+.links a { color: var(--ink); text-underline-offset: 3px; }
+
+.about { font-size: 13px; color: var(--ink-2); display: grid; gap: 8px; border-top: 1px solid var(--rule); padding-top: 14px; }
+.about p { margin: 0; }
+.about a { color: inherit; }
+
+.layers { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(10px + env(safe-area-inset-right, 0px));
+  background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 6px;
+  font-size: 13.5px; box-shadow: 0 2px 10px rgb(0 0 0 / .12); z-index: 2; }
+.layers label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.layers input { accent-color: var(--ink); }
+.legend { position: absolute; left: calc(10px + env(safe-area-inset-left, 0px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r); padding: 8px 10px; font-size: 12px;
+  display: grid; gap: 5px; z-index: 2; max-width: calc(100% - 20px); }
+.legend .ramp { height: 7px; width: 140px; border-radius: 3px; }
+.legend .ends { display: flex; justify-content: space-between; width: 140px; color: var(--ink-2); }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-2); z-index: 1; pointer-events: none; }
+.town { font: 600 12px/1 var(--font-display); letter-spacing: .04em; color: #1b2824; text-shadow: 0 0 3px #fff, 0 0 2px #fff; pointer-events: none; white-space: nowrap; }
+.poi { display: flex; align-items: center; gap: 4px; font: 600 12px/1 var(--font-body); color: #1b2824; text-shadow: 0 0 3px #fff, 0 0 2px #fff; white-space: nowrap; pointer-events: none; }
+.poi i { width: 9px; height: 9px; border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgb(0 0 0 / .35); display: inline-block; }
+.poi.rifugio i, .poi.malga i, .poi.bivacco i { background: #7d5133; border-radius: 2px; }
+.poi.malga i { border-radius: 50%; }
+.poi.lake i { background: #286f98; border-radius: 50%; }
+.poi.peak i { background: #1b2824; clip-path: polygon(50% 0, 100% 100%, 0 100%); border: 0; box-shadow: none; width: 11px; height: 10px; }
+.poi.goal span { font-size: 13px; }
+.start { width: 22px; height: 22px; border-radius: 5px; background: #1f5fb0; color: #fff; font: 700 13px/22px var(--font-body); text-align: center; border: 2px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
+.view { width: 18px; height: 18px; border-radius: 50%; background: #5566ad; border: 2px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
+.maplibregl-popup-content { background: var(--panel); color: var(--ink); font: 13px/1.3 var(--font-body); padding: 7px 10px; border-radius: 8px; }
+.maplibregl-popup-tip { border-top-color: var(--panel) !important; border-bottom-color: var(--panel) !important; }
+
+@media (max-width: 860px) {
+  html, body { height: auto; }
+  .app { display: flex; flex-direction: column; height: auto; }
+  .mapwrap { order: -1; height: 56vh; min-height: 330px; }
+  .panel { overflow: visible; border-right: 0; padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); }
+  .stats, .scores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .legend { display: none; }
+  .layers { padding: 7px 9px; gap: 4px; font-size: 12.5px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style id="maplibre-css">/*MAPLIBRE_CSS*/</style>
+
+<div class="app">
+  <aside class="panel" id="panel">
+    <header class="brand">
+      <h1>Sentieri d'<span>autunno</span></h1>
+      <p>Escursioni ad anello e di andata e ritorno in Trentino-Alto Adige, scelte in base a come sono i boschi adesso e al meteo del weekend.</p>
+      <div class="fresh"><span id="fresh-img"><i style="background:var(--larch)"></i>Carico le immagini…</span><span id="fresh-wx"></span></div>
+    </header>
+
+    <div id="browse" style="display:grid;gap:18px">
+      <section aria-labelledby="want">
+        <div class="label" id="want">Cosa cerchi</div>
+        <div class="chips" id="presets"></div>
+        <div class="weights" id="weights"></div>
+      </section>
+
+      <section aria-labelledby="when">
+        <div class="label" id="when">Quando</div>
+        <div class="chips" id="days"></div>
+      </section>
+
+      <details class="filters" id="filters">
+        <summary><span>Filtri <span id="nfilters" class="hint"></span></span></summary>
+        <div class="filter-grid">
+          <div>
+            <div class="row"><label for="f-hours">Tempo di cammino</label><output id="o-hours"></output></div>
+            <input type="range" id="f-hours" min="2" max="9" step="0.5">
+          </div>
+          <div>
+            <div class="row"><label for="f-up">Dislivello in salita</label><output id="o-up"></output></div>
+            <input type="range" id="f-up" min="200" max="2000" step="100">
+          </div>
+          <div>
+            <div class="label" style="margin-bottom:6px">Difficoltà (scala CAI)</div>
+            <div class="diffs" id="diffs"></div>
+          </div>
+          <div>
+            <div class="label" style="margin-bottom:6px">Parto da</div>
+            <div class="near">
+              <input id="f-near" list="places" placeholder="Paese o città" autocomplete="off">
+              <select id="f-radius" aria-label="Distanza massima">
+                <option value="10">10 km</option><option value="20">20 km</option>
+                <option value="35">35 km</option><option value="50">50 km</option>
+              </select>
+            </div>
+            <datalist id="places"></datalist>
+            <p class="hint">Distanza in linea d'aria dal punto di partenza dell'escursione.</p>
+          </div>
+          <div class="checks">
+            <label><input type="checkbox" id="f-dry"> Solo con tempo buono nel giorno scelto</label>
+            <label><input type="checkbox" id="f-snow"> Evita i percorsi con neve nelle ultime immagini</label>
+            <label><input type="checkbox" id="f-loop"> Solo anelli</label>
+            <label><input type="checkbox" id="f-family"> Adatte alle famiglie</label>
+            <label><input type="checkbox" id="f-bus"> Partenza da una fermata dell'autobus</label>
+          </div>
+        </div>
+      </details>
+
+      <section aria-live="polite">
+        <div class="results-head"><h2>Escursioni consigliate</h2><span id="rcount"></span></div>
+        <div class="cards" id="cards"><div class="empty">Carico le escursioni, le immagini satellitari e il meteo…</div></div>
+        <button class="more" id="more" type="button" hidden>Mostra altre escursioni</button>
+      </section>
+    </div>
+
+    <div id="detail" class="detail" hidden></div>
+
+    <footer class="about">
+      <p><b>Come funziona.</b> Ogni escursione parte da un parcheggio o da una fermata dell'autobus vicini ai sentieri segnati,
+        raggiunge una meta (rifugio, malga, cima, lago o punto panoramico) e torna con un anello quando esiste una via diversa
+        non troppo più lunga, altrimenti per la stessa strada. Il foliage confronta l'ultima immagine Sentinel-2 senza nuvole
+        con la più verde dell'estate: conta come "in colore" un albero virato al giallo-arancio con le foglie ancora sui rami.
+        Panorami: quanto è libero l'orizzonte e quali cime si vedono, calcolato sul modello del terreno.</p>
+      <p><b>Limiti.</b> Foliage e neve sono stime da satellite a 20 m; tempi e dislivelli sono calcolati, non misurati; il meteo è
+        una previsione automatica. Prima di partire controlla bollettini, aperture dei rifugi e stato dei sentieri.</p>
+      <p>Dati: © OpenStreetMap contributors (ODbL), Overture Maps Foundation, Copernicus Sentinel-2 (2026) e Copernicus DEM,
+        ESA WorldCover 2021, meteo <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0),
+        webcam <a href="https://www.foto-webcam.eu/" target="_blank" rel="noopener">foto-webcam.eu</a>, foto Wikimedia Commons (autori e licenze nelle schede).</p>
+    </footer>
+  </aside>
+
+  <main class="mapwrap">
+    <div id="map" role="region" aria-label="Mappa delle escursioni"></div>
+    <div class="loading" id="loading">Preparo la mappa…</div>
+    <div class="layers">
+      <label><input type="radio" name="bg" value="base" checked> Rilievo</label>
+      <label><input type="radio" name="bg" value="satellite"> <span id="sat-label">Satellite</span></label>
+      <label><input type="checkbox" id="l-foliage" checked> Alberi in colore</label>
+      <label><input type="checkbox" id="l-snow" checked> Neve</label>
+    </div>
+    <div class="legend">
+      <div class="label">Alberi in colore</div>
+      <div class="ramp" style="background:linear-gradient(90deg, rgb(242 190 60 / .35), rgb(214 96 24))"></div>
+      <div class="ends"><span>pochi</span><span>bosco pieno</span></div>
+      <div class="label" style="margin-top:3px">Escursione, punteggio</div>
+      <div class="ramp" style="background:linear-gradient(90deg,#46504c,#6f6236,#d1861b,#c95314,#9e1f10)"></div>
+      <div class="ends"><span>basso</span><span>alto</span></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:2px"><span style="width:14px;height:10px;border-radius:2px;background:#ecf6ff;border:1px solid var(--rule)"></span>neve nelle ultime immagini</div>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+"use strict";
+const KEYS = ["foliage", "panorama", "lakes", "huts"];
+const NAMES = { foliage: "Foliage", panorama: "Panorami", lakes: "Laghi", huts: "Rifugi" };
+const LEVELS = ["Non conta", "Un po'", "Conta", "Molto"];
+const PRESETS = {
+  foliage: { label: "Foliage adesso", w: { foliage: 3, panorama: 1, lakes: 0, huts: 1 } },
+  panorama: { label: "Panorami", w: { foliage: 0, panorama: 3, lakes: 1, huts: 0 } },
+  lakes: { label: "Laghi", w: { foliage: 1, panorama: 1, lakes: 3, huts: 0 } },
+  huts: { label: "Rifugi", w: { foliage: 1, panorama: 1, lakes: 0, huts: 3 } },
+  family: { label: "In famiglia", w: { foliage: 2, panorama: 1, lakes: 2, huts: 2 }, family: true },
+};
+const DIFFS = [["T", "T · turistico"], ["E", "E · escursionistico"], ["EE", "EE · esperti"], ["EEA", "EEA · attrezzato"], ["?", "non indicata"]];
+const DIFF_TEXT = { T: "Turistico (T)", E: "Escursionistico (E)", EE: "Per escursionisti esperti (EE)", EEA: "Esperti con attrezzatura (EEA)", "?": "Difficoltà non indicata" };
+const DEFAULT_DIFF = ["T", "E", "EE", "?"];
+const GOAL = { rifugio: "rifugio", malga: "malga", bivacco: "bivacco", peak: "cima", lake: "lago", viewpoint: "punto panoramico" };
+// WMO weather codes as used by Open-Meteo
+const WX = { 0: ["sereno", "good"], 1: ["poco nuvoloso", "good"], 2: ["nuvoloso a tratti", "good"], 3: ["coperto", "fair"],
+  45: ["nebbia", "fair"], 48: ["nebbia", "fair"], 51: ["pioviggine", "bad"], 53: ["pioviggine", "bad"], 55: ["pioviggine", "bad"],
+  56: ["pioviggine gelata", "bad"], 57: ["pioviggine gelata", "bad"], 61: ["pioggia debole", "bad"], 63: ["pioggia", "bad"],
+  65: ["pioggia forte", "bad"], 66: ["pioggia gelata", "bad"], 67: ["pioggia gelata", "bad"], 71: ["neve debole", "bad"],
+  73: ["neve", "bad"], 75: ["neve forte", "bad"], 77: ["nevischio", "bad"], 80: ["rovesci", "bad"], 81: ["rovesci", "bad"],
+  82: ["rovesci forti", "bad"], 85: ["rovesci di neve", "bad"], 86: ["rovesci di neve", "bad"], 95: ["temporale", "bad"],
+  96: ["temporale con grandine", "bad"], 99: ["temporale con grandine", "bad"] };
+const STORE = "sentieri-autunno-v2";
+const PAGE = 40;
+const EMPTY_PNG = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="), c => c.charCodeAt(0)).buffer;
+
+const state = {
+  preset: "foliage", w: { ...PRESETS.foliage.w }, day: 0,
+  f: { hours: 9, up: 2000, diff: [...DEFAULT_DIFF], snow: true, dry: false, loop: false, family: false, bus: false, near: "", radius: 20 },
+  shown: PAGE, sel: null,
+};
+let HIKES = [], BY_ID = new Map(), POIS = [], PLACES = new Map(), INFO = {}, TILES = null;
+let map = null, mapReady = false, ranked = [], markers = [], hoverPopup = null, hoverId = null;
+const PACKS = new Map(), DETAILS = new Map();
+
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+const COLORS = () => ({ foliage: css("--larch"), panorama: css("--sky"), lakes: css("--lake"), huts: css("--hut") });
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+const fmt1 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const fmt0 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 });
+function hours(h) { const m = Math.round(h * 60 / 5) * 5; const hh = Math.floor(m / 60), mm = m % 60; return hh ? `${hh} h${mm ? " " + String(mm).padStart(2, "0") : ""}` : `${mm} min`; }
+function pct(x) { return `${Math.round(x * 100)}%`; }
+function dateOf(iso) { return new Date(iso + "T12:00:00"); }
+function dayName(iso, long) { return dateOf(iso).toLocaleDateString("it-IT", long ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric" }); }
+function range(dates) {
+  if (!dates.length) return "";
+  const a = dateOf(dates[0]), b = dateOf(dates[dates.length - 1]);
+  const month = d => d.toLocaleDateString("it-IT", { month: "long" });
+  if (+a === +b) return `del ${a.getDate()} ${month(a)}`;
+  if (a.getMonth() === b.getMonth()) return `dal ${a.getDate()} al ${b.getDate()} ${month(b)}`;
+  return `dal ${a.getDate()} ${month(a)} al ${b.getDate()} ${month(b)}`;
+}
+
+function loadPrefs() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE) || "null");
+    if (s && s.w && s.f) { state.w = { ...state.w, ...s.w }; state.f = { ...state.f, ...s.f }; state.preset = s.preset ?? null; state.day = s.day ?? 0; }
+  } catch (e) { /* storage unavailable: defaults */ }
+}
+function savePrefs() { try { localStorage.setItem(STORE, JSON.stringify({ w: state.w, f: state.f, preset: state.preset, day: state.day })); } catch (e) { } }
+
+function decode(str) {
+  let i = 0, lat = 0, lng = 0; const out = [];
+  while (i < str.length) {
+    for (const which of [0, 1]) {
+      let b, shift = 0, res = 0;
+      do { b = str.charCodeAt(i++) - 63; res |= (b & 31) << shift; shift += 5; } while (b >= 32);
+      const d = (res & 1) ? ~(res >> 1) : (res >> 1);
+      if (which === 0) lat += d; else lng += d;
+    }
+    out.push([lng / 1e5, lat / 1e5]);
+  }
+  return out;
+}
+function loadPack(dir, name) {
+  const key = `${dir}/${name}`;
+  if (!PACKS.has(key)) PACKS.set(key, fetch(`data/${dir}/${name}.webp`).then(r => { if (!r.ok) throw new Error(key); return r.arrayBuffer(); }));
+  return PACKS.get(key);
+}
+// Profile, panorama and webcams of a hike live in small files loaded when its card opens.
+function loadDetail(r) {
+  if (r._d) return Promise.resolve(r);
+  const chunk = Math.floor((r.id - 1) / INFO.detail_chunk);
+  if (!DETAILS.has(chunk)) DETAILS.set(chunk, fetch(`data/details/d${chunk}.json`).then(x => { if (!x.ok) throw new Error("details"); return x.json(); }));
+  return DETAILS.get(chunk).then(d => { Object.assign(r, d[r.id] || {}); r._d = true; return r; });
+}
+// DIN 33466, the walking-time rule of the Alpine clubs: 4 km/h on the flat, 300 m/h up, 500 m/h down
+function din(km, up, down) { const h = km / 4, v = up / 300 + down / 500; return Math.max(h, v) + Math.min(h, v) / 2; }
+
+/* ---------- hikes ---------- */
+function goalName(r) { return r.gn || (r.gk === "lake" ? "Laghetto alpino" : "Punto panoramico"); }
+function title(r) { return goalName(r) + (r.gk === "peak" && r.ge ? ` (${fmt0.format(r.ge)} m)` : ""); }
+function subtitle(r) { return `${r.kind === "loop" ? "Anello" : "Andata e ritorno"} da ${r.hn || "un parcheggio"}${r.hk === "bus" ? " (bus)" : ""}`; }
+function diffOf(r) { return r.diff || "?"; }
+function wxDay(r, d) {
+  const w = r.wx && r.wx[d]; if (!w || w[0] == null) return null;
+  const [code, tmax, prec, prob, gust, fl, sun, snowf] = w;
+  const [txt, cls] = WX[code] || ["variabile", "fair"];
+  return { code, txt, cls: (prec ?? 0) >= 2 && cls === "good" ? "fair" : cls, tmax, prec, prob, gust, fl, sun, snowf };
+}
+function score(r) {
+  let tw = 0, acc = 0;
+  for (const k of KEYS) { tw += state.w[k]; acc += state.w[k] * r.sc[k]; }
+  const base = tw ? acc / tw : (r.sc.foliage + r.sc.panorama + r.sc.lakes + r.sc.huts) / 4;
+  return base * (1 - 0.4 * r.road);  // asphalt makes a worse walk
+}
+function nearPlace() { return PLACES.get(state.f.near.trim().toLowerCase()) || null; }
+function km(a, b) {
+  const R = 6371, t = Math.PI / 180, dLat = (b[1] - a[1]) * t, dLon = (b[0] - a[0]) * t;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * t) * Math.cos(b[1] * t) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function passes(r, place) {
+  const f = state.f;
+  if (f.hours < 9 && r.h > f.hours) return false;
+  if (f.up < 2000 && r.up > f.up) return false;
+  if (!f.diff.includes(diffOf(r))) return false;
+  if (f.snow && r.snow > 0.15) return false;
+  if (f.loop && r.kind !== "loop") return false;
+  if (f.family && !r.fam) return false;
+  if (f.bus && r.hk !== "bus") return false;
+  if (f.dry) { const w = wxDay(r, state.day); if (w && (w.cls === "bad" || (w.prec ?? 0) >= 1)) return false; }
+  if (place && km(r.st, place) > f.radius) return false;
+  return true;
+}
+function reasons(r) {
+  const out = [];
+  if (r.sc.foliage >= 25 && r.fs > 0.04) out.push(`${pct(r.fs)} del percorso tra alberi in colore`);
+  if (r.pn >= 3 && state.w.panorama) out.push(`vista su ${r.pn} cime con nome`);
+  else if (r.pk.length && state.w.panorama) out.push(`cima ${r.pk[0][0]}`);
+  if (r.lk.length) out.push(r.lk.slice(0, 2).join(", "));
+  if (r.hr.length) out.push(r.hr[0]); else if (r.hm.length) out.push(r.hm[0]);
+  return out;
+}
+const GLYPH = {
+  peak: '<path d="M2 21 L10 7 L14 13 L16 10 L22 21 Z" fill="currentColor"/><path d="M8.3 10 L10 7 L11.8 10 L10.6 9.4 L9.4 10.4 Z" fill="var(--panel)"/>',
+  rifugio: '<path d="M3 12 L12 4 L21 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M6 11 V20 H18 V11" fill="currentColor"/><rect x="10.3" y="14" width="3.4" height="6" fill="var(--panel)"/>',
+  malga: '<path d="M2.5 13 L12 6 L21.5 13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M5.5 12 V19 H18.5 V12" fill="currentColor"/>',
+  bivacco: '<path d="M3 20 Q12 2 21 20 Z" fill="currentColor"/>',
+  lake: '<path d="M3 10 q3 -3 6 0 t6 0 t6 0" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M3 15 q3 -3 6 0 t6 0 t6 0" fill="none" stroke="currentColor" stroke-width="2.2"/>',
+  viewpoint: '<circle cx="12" cy="12" r="3.2" fill="currentColor"/><path d="M2 12 Q12 3 22 12 Q12 21 2 12 Z" fill="none" stroke="currentColor" stroke-width="2"/>',
+};
+function glyph(r) { return `<span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24">${GLYPH[r.gk] || GLYPH.viewpoint}</svg></span>`; }
+function wxPill(r, d) {
+  const w = wxDay(r, d); if (!w) return "";
+  return `<span class="pill ${w.cls}">${esc(dayName(INFO.weather_days[d]))}: ${esc(w.txt)}${w.tmax != null ? `, ${w.tmax}° in cima` : ""}</span>`;
+}
+
+/* ---------- controls ---------- */
+function buildControls() {
+  const pre = document.getElementById("presets");
+  pre.innerHTML = Object.entries(PRESETS).map(([k, p]) => `<button class="chip" type="button" data-p="${k}" aria-pressed="false">${p.label}</button>`).join("");
+  pre.addEventListener("click", e => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    const p = PRESETS[b.dataset.p];
+    state.preset = b.dataset.p; state.w = { ...p.w }; state.f.family = !!p.family;
+    syncControls(); update();
+  });
+  document.getElementById("weights").innerHTML = KEYS.map(k => `<div class="weight"><label for="w-${k}"><i data-k="${k}"></i>${NAMES[k]}</label>
+    <input type="range" id="w-${k}" min="0" max="3" step="1"><output id="ow-${k}"></output></div>`).join("");
+  for (const k of KEYS) document.getElementById(`w-${k}`).addEventListener("input", e => { state.w[k] = +e.target.value; state.preset = null; syncControls(); update(); });
+  document.getElementById("days").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; state.day = +b.dataset.d; syncControls(); update(); if (state.sel != null) renderDetail(BY_ID.get(state.sel)); });
+  document.getElementById("diffs").innerHTML = DIFFS.map(([v, l]) => `<label><input type="checkbox" value="${v}">${l}</label>`).join("");
+  document.getElementById("diffs").addEventListener("change", () => { state.f.diff = [...document.querySelectorAll("#diffs input:checked")].map(i => i.value); syncControls(); update(); });
+  const bind = (id, key, conv, ev = "input") => document.getElementById(id).addEventListener(ev, e => {
+    state.f[key] = conv(e.target.type === "checkbox" ? e.target.checked : e.target.value); syncControls(); update();
+  });
+  bind("f-hours", "hours", Number); bind("f-up", "up", Number);
+  for (const k of ["snow", "dry", "loop", "family", "bus"]) bind(`f-${k}`, k, Boolean, "change");
+  bind("f-radius", "radius", Number, "change"); bind("f-near", "near", String, "change");
+  document.getElementById("f-near").addEventListener("input", e => { if (!e.target.value) { state.f.near = ""; syncControls(); update(); } });
+  document.getElementById("more").addEventListener("click", () => { state.shown += PAGE; renderList(); paintMap(); });
+  const cards = document.getElementById("cards");
+  cards.addEventListener("click", e => { const c = e.target.closest(".card"); if (c) select(+c.dataset.id, true); });
+  cards.addEventListener("mouseover", e => { const c = e.target.closest(".card"); hover(c ? +c.dataset.id : null); });
+  cards.addEventListener("mouseleave", () => hover(null));
+}
+function syncControls() {
+  const colors = COLORS(), f = state.f;
+  document.querySelectorAll("#presets .chip").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.p === state.preset)));
+  for (const k of KEYS) { document.getElementById(`w-${k}`).value = state.w[k]; document.getElementById(`ow-${k}`).textContent = LEVELS[state.w[k]]; }
+  document.querySelectorAll(".weight i").forEach(i => i.style.background = colors[i.dataset.k]);
+  const days = INFO.weather_days || [];
+  if (state.day >= days.length) state.day = 0;
+  document.getElementById("days").innerHTML = days.length
+    ? days.map((d, i) => `<button class="chip" type="button" data-d="${i}" aria-pressed="${i === state.day}">${esc(dayName(d, true))}</button>`).join("")
+    : `<span class="hint">Previsioni non disponibili.</span>`;
+  document.getElementById("f-hours").value = f.hours;
+  document.getElementById("o-hours").textContent = f.hours >= 9 ? "qualsiasi" : `fino a ${hours(f.hours)}`;
+  document.getElementById("f-up").value = f.up;
+  document.getElementById("o-up").textContent = f.up >= 2000 ? "qualsiasi" : `fino a ${fmt0.format(f.up)} m`;
+  document.querySelectorAll("#diffs input").forEach(i => i.checked = f.diff.includes(i.value));
+  for (const k of ["snow", "dry", "loop", "family", "bus"]) document.getElementById(`f-${k}`).checked = f[k];
+  document.getElementById("f-radius").value = String(f.radius);
+  const near = document.getElementById("f-near"); if (document.activeElement !== near) near.value = f.near;
+  const diffChanged = f.diff.length !== DEFAULT_DIFF.length || DEFAULT_DIFF.some(d => !f.diff.includes(d));
+  const n = (f.hours < 9) + (f.up < 2000) + diffChanged + f.dry + f.loop + f.family + f.bus + !!nearPlace();
+  document.getElementById("nfilters").textContent = n ? `· ${n} attivi` : "";
+}
+
+/* ---------- ranking and list ---------- */
+let pending = false;
+function update() {
+  if (pending) return; pending = true;
+  requestAnimationFrame(() => { pending = false; savePrefs(); rank(); renderList(); paintMap(); });
+}
+function rank() {
+  const place = nearPlace();
+  ranked = [];
+  for (const r of HIKES) { r._on = passes(r, place); r._s = score(r); if (r._on) ranked.push(r); }
+  ranked.sort((a, b) => b._s - a._s || b.sc.foliage - a.sc.foliage);
+  state.shown = Math.max(PAGE, Math.min(state.shown, ranked.length));
+}
+function headline() {
+  const top = Math.max(...KEYS.map(x => state.w[x]));
+  const names = KEYS.filter(k => state.w[k] === top && top > 0).map(k => NAMES[k].toLowerCase());
+  return names.length ? `ordinate per ${names.join(" e ")}` : "ordinate per punteggio";
+}
+function renderList() {
+  const cards = document.getElementById("cards"), place = nearPlace();
+  document.getElementById("rcount").textContent = `${fmt0.format(ranked.length)} su ${fmt0.format(HIKES.length)} · ${headline()}`;
+  if (!ranked.length) {
+    cards.innerHTML = `<div class="empty">Nessuna escursione con questi filtri. Prova ad allargare tempo, dislivello o distanza${place ? ` da ${esc(state.f.near)}` : ""}, o un altro giorno.</div>`;
+    document.getElementById("more").hidden = true; return;
+  }
+  const colors = COLORS();
+  cards.innerHTML = ranked.slice(0, state.shown).map(r => {
+    const why = reasons(r);
+    const bars = KEYS.map(k => `<i style="height:${Math.max(2, r.sc[k] * 0.18)}px;background:${colors[k]};opacity:${state.w[k] ? 1 : .35}"></i>`).join("");
+    const dist = place ? ` · ${fmt0.format(km(r.st, place))} km` : "";
+    const snow = r.snow > 0.05 ? `<span class="pill snow">neve sul ${pct(r.snow)}</span>` : "";
+    return `<button class="card${r.id === state.sel ? " hot" : ""}" data-id="${r.id}" type="button">
+      ${glyph(r)}
+      <span class="card-main"><span class="card-title">${esc(title(r))}</span>
+        <span class="card-sub">${esc(subtitle(r))}${dist}</span>
+        <span class="card-meta">${fmt1.format(r.km)} km · ↑ ${fmt0.format(r.up)} m · ${hours(r.h)} · max ${fmt0.format(r.emax)} m · ${diffOf(r) === "?" ? "diff. n.d." : diffOf(r)}</span>
+        ${why.length ? `<span class="card-why">${esc(why.join(" · "))}</span>` : ""}
+        <span class="pills">${wxPill(r, state.day)}${snow}</span></span>
+      <span class="card-score"><b>${Math.round(r._s)}</b><span class="bars" aria-hidden="true">${bars}</span></span></button>`;
+  }).join("");
+  document.getElementById("more").hidden = state.shown >= ranked.length;
+}
+
+/* ---------- detail ---------- */
+function niceStep(span) { for (const s of [20, 50, 100, 200, 250, 500, 1000]) if (span / s <= 5) return s; return 1000; }
+function profileSVG(r) {
+  const z = r.pz, n = z.length, W = 360, H = 150, L = 40, R = 10, T = 10, B = 40;
+  const zmin = Math.min(...z), zmax = Math.max(...z), step = niceStep(Math.max(zmax - zmin, 60));
+  const lo = Math.floor(zmin / step) * step, hi = Math.max(Math.ceil(zmax / step) * step, lo + step);
+  const x = i => L + (W - L - R) * i / (n - 1), y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  const line = z.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const area = `${line}L${x(n - 1).toFixed(1)},${y(lo).toFixed(1)}L${x(0).toFixed(1)},${y(lo).toFixed(1)}Z`;
+  let grid = "";
+  for (let v = lo; v <= hi + 1e-6; v += step) grid += `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--rule)"/><text class="axis" x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${fmt0.format(v)}</text>`;
+  const cw = (W - L - R) / n, sy = H - B + 8;
+  const strip = [...r.pf].map((d, i) => `<rect x="${(L + i * cw).toFixed(1)}" y="${sy}" width="${(cw + 0.4).toFixed(1)}" height="9" fill="${+d ? "var(--larch)" : "var(--chip)"}" fill-opacity="${+d ? (0.25 + 0.75 * d / 9).toFixed(2) : 1}"/>`).join("");
+  const ticks = [0, 0.5, 1].map(t => `<text class="axis" x="${(L + (W - L - R) * t).toFixed(1)}" y="${H - 6}" text-anchor="${t === 0 ? "start" : t === 1 ? "end" : "middle"}">${fmt1.format(r.km * t)} km</text>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Profilo altimetrico da ${fmt0.format(zmin)} a ${fmt0.format(zmax)} metri, con la fascia degli alberi in colore">
+    ${grid}<path d="${area}" fill="var(--chip)"/><path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/>
+    <text class="axis" x="${L}" y="${sy - 3}">alberi in colore lungo il percorso</text>${strip}${ticks}</svg>`;
+}
+function skyAngles(b64) { const s = atob(b64); return Array.from(s, c => ((c.charCodeAt(0) << 24) >> 24) * 0.2); }
+function panoramaSVG(p) {
+  const [vp, sky64, peaks] = p, sky = skyAngles(sky64), n = sky.length;
+  const W = 1080, H = 210, top = 96, base = H - 26;
+  const lo = Math.min(...sky) - 0.8, hi = Math.max(...sky, ...peaks.map(q => q[3])) + 0.5;
+  const ky = (base - top) / Math.max(hi - lo, 3);
+  const x = az => az / 360 * W, y = a => base - (a - lo) * ky;
+  const pts = sky.map((a, i) => `${x(i * 360 / n).toFixed(1)},${y(a).toFixed(1)}`);
+  pts.push(`${W},${y(sky[0]).toFixed(1)}`);
+  const ground = `M0,${base} L${pts.join(" L")} L${W},${base} Z`;
+  const labels = peaks.map(([name, ele, az, ang, kmv]) => {
+    const px = x(az).toFixed(1), py = y(ang).toFixed(1);
+    return `<line x1="${px}" x2="${px}" y1="${py}" y2="${top - 4}" stroke="var(--ink-2)" stroke-width="0.8" stroke-dasharray="2 2"/>
+      <text class="lbl" transform="translate(${px},${top - 8}) rotate(-45)">${esc(name)} ${fmt0.format(ele)} m · ${fmt0.format(kmv)} km</text>`;
+  }).join("");
+  const axes = [["N", 0], ["NE", 45], ["E", 90], ["SE", 135], ["S", 180], ["SO", 225], ["O", 270], ["NO", 315]]
+    .map(([t, az]) => `<text class="ax" x="${x(az) + (az ? 0 : 4)}" y="${H - 8}" text-anchor="${az ? "middle" : "start"}">${t}</text>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Panorama a 360 gradi con ${peaks.length} cime indicate">
+    <path d="${ground}" fill="color-mix(in srgb, var(--sky) 30%, var(--panel))" stroke="var(--ink)" stroke-width="1.2" stroke-linejoin="round"/>${labels}${axes}</svg>`;
+}
+function wxCard(r, d) {
+  const w = wxDay(r, d), iso = INFO.weather_days[d];
+  if (!w) return `<div class="wx-day"><h3>${esc(dayName(iso, true))}</h3><span class="hint">Previsione non disponibile</span></div>`;
+  return `<div class="wx-day${d === state.day ? " sel" : ""}"><h3>${esc(dayName(iso, true))}</h3>
+    <b><span class="pill ${w.cls}">${esc(w.txt)}</span></b>
+    <dl><dt>In cima</dt><dd>${w.tmax != null ? `${w.tmax}°C (a ${fmt0.format(r.emax)} m)` : "—"}</dd>
+      <dt>Pioggia</dt><dd>${w.prec != null ? `${fmt1.format(w.prec)} mm` : "—"}${w.prob != null ? `, prob. ${w.prob}%` : ""}</dd>
+      ${w.snowf ? `<dt>Neve</dt><dd>${fmt1.format(w.snowf)} cm</dd>` : ""}
+      <dt>Raffiche</dt><dd>${w.gust != null ? `${fmt0.format(w.gust)} km/h` : "—"}</dd>
+      <dt>Zero termico</dt><dd>${w.fl != null ? `${fmt0.format(w.fl)} m` : "—"}</dd>
+      <dt>Sole</dt><dd>${w.sun != null ? `${fmt1.format(w.sun)} ore` : "—"}</dd></dl></div>`;
+}
+function renderDetail(r) {
+  if (!r || !r._d) return;
+  const el = document.getElementById("detail"), colors = COLORS(), d = diffOf(r);
+  const why = [];
+  if (r.fs > 0.04) why.push(`Il ${pct(r.fs)} del percorso passa tra alberi che hanno cambiato colore rispetto all'estate.`);
+  else why.push("Poco bosco in colore lungo il percorso: conifere sempreverdi, prati o roccia, oppure foglie già cadute.");
+  if (r.pano && r.pano[2].length) why.push(`Dal punto più panoramico (${fmt0.format(r.pano[0][2])} m) si vedono, tra le altre, ${r.pano[2].slice(0, 3).map(p => p[0]).join(", ")}.`);
+  if (r.lk.length) why.push(`Passa vicino a ${r.lk.join(", ")}.`); else if (r.nl) why.push(r.nl === 1 ? "Passa vicino a un laghetto." : `Passa vicino a ${r.nl} laghetti.`);
+  const huts = [...r.hr, ...r.hm, ...r.hb];
+  if (huts.length) why.push(`Punti d'appoggio: ${huts.slice(0, 4).join(", ")}.`);
+  if (r.marked > 0.7) why.push(`Il ${pct(r.marked)} del percorso è su sentieri segnati${r.refs.length ? ` (${r.refs.slice(0, 5).join(", ")})` : ""}.`);
+  const warn = [];
+  if (r.snow > 0.05) warn.push(`Neve su circa il ${pct(r.snow)} del percorso nelle ultime immagini.`);
+  if (r.road > 0.25) warn.push(`Circa il ${pct(r.road)} del percorso è su strade asfaltate o carrozzabili.`);
+  if (r.seen < 0.7) warn.push(`Solo il ${pct(r.seen)} del percorso ha immagini chiare recenti: la stima del foliage è meno affidabile.`);
+  if (r.marked < 0.4) warn.push("Buona parte del percorso è fuori dai sentieri numerati: controlla la traccia sulla mappa.");
+  const along = [];
+  if (r.hr.length) along.push(["Rifugi", r.hr.join(", ")]);
+  if (r.hm.length) along.push(["Malghe", r.hm.join(", ")]);
+  if (r.hb.length) along.push(["Bivacchi", r.hb.join(", ")]);
+  if (r.lk.length) along.push(["Laghi", r.lk.join(", ")]);
+  if (r.pk.length) along.push(["Cime", r.pk.map(p => p[0]).join(", ")]);
+  if (r.refs.length) along.push(["Sentieri", r.refs.join(", ")]);
+  const back = r.kind === "loop" ? "anello" : "andata e ritorno";
+  const days = (INFO.weather_days || []).map((_, i) => wxCard(r, i)).join("");
+  const cams = (r.cam || []).map(([t, link, sees, kmv]) => `<div><a href="${esc(link)}" target="_blank" rel="noopener">${esc(t)}</a> — ${sees ? "inquadra la zona del percorso" : `a ${fmt1.format(kmv)} km`}</div>`).join("");
+  const [lon, lat] = r.st;
+  el.innerHTML = `
+    <button class="back" type="button" id="back">← Tutte le escursioni</button>
+    <div class="d-head">${glyph(r)}<div><h2>${esc(title(r))}</h2><p>${esc(subtitle(r))} · ${esc(DIFF_TEXT[d])}</p></div></div>
+    ${r.ph ? `<figure class="photo"><img id="photo" alt="${esc(goalName(r))}"><figcaption>Foto: ${esc(r.ph[3])}, ${esc(r.ph[4])}, <a href="${esc(r.ph[5])}" target="_blank" rel="noopener">Wikimedia Commons</a></figcaption></figure>` : ""}
+    <div class="stats">
+      <div class="stat"><b>${fmt1.format(r.km)} km</b><span>${back}</span></div>
+      <div class="stat"><b>↑ ${fmt0.format(r.up)} m</b><span>↓ ${fmt0.format(r.down)} m</span></div>
+      <div class="stat"><b>${hours(r.h)}</b><span>cammino, soste escluse</span></div>
+      <div class="stat"><b>${fmt0.format(r.emax)} m</b><span>quota max · min ${fmt0.format(r.emin)}</span></div>
+    </div>
+    <div class="scores">${KEYS.map(k => `<div class="score"><span>${NAMES[k]}</span><b>${r.sc[k]}</b><div class="meter"><i style="width:${r.sc[k]}%;background:${colors[k]}"></i></div></div>`).join("")}</div>
+    ${days ? `<section><div class="label">Meteo del weekend</div><div class="wx">${days}</div></section>` : ""}
+    ${r.pano ? `<section><div class="label">Cosa si vede${r.pano[3] ? ` dalla cima di ${esc(r.pano[3])}` : ` dal punto più panoramico (${fmt0.format(r.pano[0][2])} m)`}</div>
+      <div class="pano">${panoramaSVG(r.pano)}</div><p class="hint">Profilo dell'orizzonte calcolato sul terreno, con le cime visibili che lo disegnano. Scorri di lato per girare a 360°.</p></section>` : ""}
+    <div class="profile">${profileSVG(r)}</div>
+    <section><div class="label">Perché te la proponiamo</div><ul class="why">${why.map(w => `<li>${esc(w)}</li>`).join("")}</ul></section>
+    ${warn.length ? `<p class="caveat">${warn.map(esc).join(" ")}</p>` : ""}
+    ${along.length ? `<section><div class="label">Lungo il percorso</div><dl class="along">${along.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl></section>` : ""}
+    ${cams ? `<section><div class="label">Webcam</div><div class="cams">${cams}</div><p class="hint">Le immagini sono sui siti dei gestori delle webcam.</p></section>` : ""}
+    <div class="links">
+      <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Indicazioni per la partenza</a>
+      <a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=15/${lat}/${lon}" target="_blank" rel="noopener">Partenza su OpenStreetMap</a>
+    </div>
+    <p class="hint">Tempo calcolato con la regola DIN 33466 dei club alpini (4 km/h in piano, 300 m/h in salita, 500 m/h in discesa), soste escluse.</p>`;
+  document.getElementById("back").addEventListener("click", () => select(null));
+  if (r.ph) loadPack("photos", r.ph[0]).then(buf => {
+    const img = document.getElementById("photo");
+    if (img && state.sel === r.id) img.src = URL.createObjectURL(new Blob([buf.slice(r.ph[1], r.ph[1] + r.ph[2])], { type: "image/webp" }));
+  }).catch(() => { const f = document.querySelector(".photo"); if (f) f.hidden = true; });
+}
+function select(id, fly) {
+  state.sel = id;
+  const r = id != null ? BY_ID.get(id) : null;
+  document.getElementById("browse").hidden = !!r;
+  document.getElementById("detail").hidden = !r;
+  if (r) {
+    if (!r._d) document.getElementById("detail").innerHTML = `<p class="hint">Carico la scheda di ${esc(title(r))}…</p>`;
+    loadDetail(r).then(() => { if (state.sel === r.id) { renderDetail(r); if (mapReady) showMarkers(r); } })
+      .catch(() => { document.getElementById("detail").innerHTML = `<button class="back" type="button" onclick="select(null)">← Tutte le escursioni</button><p class="empty">Non riesco a caricare la scheda. Riprova.</p>`; });
+    document.getElementById("panel").scrollTop = 0;
+    if (matchMedia("(max-width: 860px)").matches) window.scrollTo({ top: 0, behavior: "smooth" });
+  } else renderList();
+  if (mapReady) {
+    map.setFilter("sel-casing", ["==", ["id"], id ?? -1]);
+    map.setFilter("sel-line", ["==", ["id"], id ?? -1]);
+    showMarkers(r && r._d ? r : null);
+    if (r && fly) fitHike(r);
+  }
+}
+
+/* ---------- map ---------- */
+function isDark() {
+  const t = document.documentElement.getAttribute("data-theme");
+  return t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+}
+function themeMap() {
+  if (!mapReady) return;
+  const dark = isDark();
+  map.setPaintProperty("bg", "background-color", css("--paper"));
+  for (const id of ["base", "satellite"]) {
+    map.setPaintProperty(id, "raster-brightness-max", dark ? 0.74 : 1);
+    map.setPaintProperty(id, "raster-saturation", dark ? -0.2 : 0);
+  }
+  map.setPaintProperty("sel-casing", "line-color", dark ? "#111715" : "#ffffff");
+  map.setPaintProperty("sel-line", "line-color", css("--trail"));
+}
+function initMap() {
+  const b = INFO.bbox;
+  maplibregl.addProtocol("pk", async params => {
+    const m = params.url.match(/^pk:\/\/(\w+)\/(\d+)\/(\d+)\/(\d+)/);
+    const e = m && TILES.layers[m[1]] && TILES.layers[m[1]][`${m[2]}/${m[3]}/${m[4]}`];
+    if (!e) return { data: EMPTY_PNG.slice(0) };
+    const buf = await loadPack("tiles", e[0]);
+    return { data: buf.slice(e[1], e[1] + e[2]) };
+  });
+  map = new maplibregl.Map({
+    container: "map", attributionControl: false, maxZoom: 14.5, minZoom: 7,
+    bounds: [[10.38, 45.66], [12.48, 47.09]], fitBoundsOptions: { padding: 16 },
+    maxBounds: [[b[0] - 0.6, b[1] - 0.4], [b[2] + 0.6, b[3] + 0.4]],
+    style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": css("--paper") } }] },
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
+  map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap contributors · Overture Maps · Copernicus Sentinel-2 2026, Copernicus DEM · ESA WorldCover" }), "bottom-right");
+  map.once("idle", () => document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"));
+  map.on("load", () => {
+    for (const [id, vis, op] of [["base", "visible", 1], ["satellite", "none", 1], ["foliage", "visible", 0.8], ["snow", "visible", 0.85]]) {
+      map.addSource(id, { type: "raster", tiles: [`pk://${id}/{z}/{x}/{y}`], tileSize: TILES.tileSize, minzoom: TILES.minzoom, maxzoom: TILES.maxzoom, bounds: TILES.bounds });
+      map.addLayer({ id, type: "raster", source: id, layout: { visibility: vis }, paint: { "raster-opacity": op, "raster-fade-duration": 150 } });
+    }
+    const features = HIKES.map(r => ({ type: "Feature", id: r.id, properties: {}, geometry: { type: "LineString", coordinates: decode(r.g) } }));
+    HIKES.forEach((r, i) => r._bbox = bboxOf(features[i].geometry.coordinates));
+    map.addSource("hikes", { type: "geojson", data: { type: "FeatureCollection", features }, tolerance: 0.5 });
+    const sc = ["coalesce", ["feature-state", "s"], 0], top = ["boolean", ["feature-state", "top"], false];
+    map.addLayer({ id: "hikes", type: "line", source: "hikes", layout: { "line-cap": "round", "line-join": "round" }, paint: {
+      "line-color": ["interpolate", ["linear"], sc, 0, "#46504c", 35, "#6f6236", 55, "#d1861b", 75, "#c95314", 92, "#9e1f10"],
+      "line-opacity": ["case", ["boolean", ["feature-state", "on"], true], ["case", top, 1, 0.55], 0.1],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 7, ["case", top, 2.2, 0.6], 10, ["case", top, 3.2, 1.1], 13, ["case", top, 5, 2.2]],
+    } });
+    map.addLayer({ id: "hover", type: "line", source: "hikes", filter: ["==", ["id"], -1], layout: { "line-cap": "round" }, paint: { "line-color": css("--trail"), "line-width": 4, "line-opacity": 0.8 } });
+    map.addLayer({ id: "sel-casing", type: "line", source: "hikes", filter: ["==", ["id"], -1], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 5, 14, 10] } });
+    map.addLayer({ id: "sel-line", type: "line", source: "hikes", filter: ["==", ["id"], -1], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": css("--trail"), "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 14, 5] } });
+    map.addLayer({ id: "hit", type: "line", source: "hikes", paint: { "line-color": "#000", "line-opacity": 0, "line-width": 12 } });
+    hoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
+    map.on("mousemove", "hit", e => {
+      const f = pick(e.features); if (!f) return;
+      map.getCanvas().style.cursor = "pointer";
+      const r = BY_ID.get(f.id);
+      hover(r.id, true);
+      hoverPopup.setLngLat(e.lngLat).setHTML(`<b>${esc(title(r))}</b><br>${esc(subtitle(r))}<br>${Math.round(r._s)} punti · ${fmt1.format(r.km)} km · ${hours(r.h)}`).addTo(map);
+    });
+    map.on("mouseleave", "hit", () => { map.getCanvas().style.cursor = ""; hoverPopup.remove(); hover(null, true); });
+    map.on("click", "hit", e => { const f = pick(e.features); if (f) select(f.id, false); });
+    document.querySelectorAll('input[name="bg"]').forEach(i => i.addEventListener("change", () =>
+      map.setLayoutProperty("satellite", "visibility", document.querySelector('input[name="bg"]:checked').value === "satellite" ? "visible" : "none")));
+    for (const id of ["foliage", "snow"]) document.getElementById(`l-${id}`).addEventListener("change", e => map.setLayoutProperty(id, "visibility", e.target.checked ? "visible" : "none"));
+    const towns = (INFO.towns || []).slice(0, matchMedia("(max-width: 860px)").matches ? 9 : 40);
+    for (const [name, lon, lat] of towns) { const el = document.createElement("div"); el.className = "town"; el.textContent = name; new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map); }
+    mapReady = true;
+    document.getElementById("loading").hidden = true;
+    themeMap(); paintMap();
+    if (state.sel != null) select(state.sel, true);
+  });
+}
+function pick(features) {
+  let best = null;
+  for (const f of features || []) { const r = BY_ID.get(f.id); if (r && r._on && (!best || r._s > BY_ID.get(best.id)._s)) best = f; }
+  return best || (features && features[0]) || null;
+}
+function bboxOf(pts) {
+  let a = 180, b = 90, c = -180, d = -90;
+  for (const [x, y] of pts) { if (x < a) a = x; if (y < b) b = y; if (x > c) c = x; if (y > d) d = y; }
+  return [[a, b], [c, d]];
+}
+function fitHike(r) {
+  const small = matchMedia("(max-width: 860px)").matches;
+  map.fitBounds(r._bbox, { padding: small ? 40 : { top: 60, bottom: 60, left: 60, right: 200 }, maxZoom: 14, duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 700 });
+}
+function paintMap() {
+  if (!mapReady) return;
+  const top = new Set(ranked.slice(0, state.shown).map(r => r.id));
+  for (const r of HIKES) map.setFeatureState({ source: "hikes", id: r.id }, { s: r._s, on: r._on, top: top.has(r.id) });
+}
+function hover(id, fromMap) {
+  if (hoverId === id) return;
+  hoverId = id;
+  if (mapReady) map.setFilter("hover", ["==", ["id"], id ?? -1]);
+  if (fromMap) document.querySelectorAll(".card.hot").forEach(c => { if (+c.dataset.id !== state.sel) c.classList.remove("hot"); });
+  if (fromMap && id != null) { const c = document.querySelector(`.card[data-id="${id}"]`); if (c) c.classList.add("hot"); }
+}
+function marker(el, lngLat, anchor = "center", offset = [0, 0]) { const m = new maplibregl.Marker({ element: el, anchor, offset }).setLngLat(lngLat).addTo(map); markers.push(m); }
+function showMarkers(r) {
+  markers.forEach(m => m.remove()); markers = [];
+  if (!r) return;
+  for (const i of (r.pi || []).slice(0, 18)) {
+    const p = POIS[i]; if (!p) continue;
+    const el = document.createElement("div");
+    el.className = `poi ${p[0]}${i === r.gp ? " goal" : ""}`;
+    el.innerHTML = `<i></i><span>${esc(p[1])}${p[4] && p[0] === "peak" ? ` ${fmt0.format(p[4])}` : ""}</span>`;
+    marker(el, [p[2], p[3]], "left", [-5, 0]);
+  }
+  const s = document.createElement("div"); s.className = "start"; s.textContent = r.hk === "bus" ? "B" : "P"; s.title = "Partenza";
+  marker(s, r.st);
+  if (r.pano) { const v = document.createElement("div"); v.className = "view"; v.title = "Punto più panoramico"; marker(v, [r.pano[0][0], r.pano[0][1]]); }
+}
+
+/* ---------- boot ---------- */
+async function boot() {
+  loadPrefs(); buildControls();
+  try {
+    const [hd, pois, tiles] = await Promise.all(["data/hikes.json", "data/pois.json", "data/tiles/index.json"].map(p => fetch(p).then(x => { if (!x.ok) throw new Error(p); return x.json(); })));
+    INFO = hd; HIKES = hd.hikes; POIS = pois; TILES = tiles;
+    for (const r of HIKES) BY_ID.set(r.id, r);
+    for (const [name, lon, lat] of hd.places || []) PLACES.set(name.toLowerCase(), [lon, lat]);
+    document.getElementById("places").innerHTML = (hd.places || []).map(p => `<option value="${esc(p[0])}"></option>`).join("");
+    const dates = (hd.image_dates || []).slice().sort();
+    document.getElementById("fresh-img").innerHTML = `<i style="background:var(--larch)"></i>Immagini Sentinel-2 ${esc(range(dates))}`;
+    if (hd.weather_issued) document.getElementById("fresh-wx").innerHTML = `<i style="background:var(--sky)"></i>Meteo Open-Meteo del ${esc(new Date(hd.weather_issued).toLocaleDateString("it-IT", { day: "numeric", month: "long" }))}`;
+    if (dates.length) document.getElementById("sat-label").textContent = `Satellite, ${dateOf(dates[dates.length - 1]).toLocaleDateString("it-IT", { month: "short", year: "numeric" })}`;
+    syncControls(); rank(); renderList();
+    if (typeof maplibregl === "undefined") throw new Error("maplibre");
+    initMap();
+  } catch (e) {
+    const msg = e.message === "maplibre" ? "La mappa non si è caricata: controlla la connessione e ricarica la pagina." : "Non riesco a caricare i dati delle escursioni. Ricarica la pagina.";
+    document.getElementById("loading").textContent = msg;
+    if (!HIKES.length) document.getElementById("cards").innerHTML = `<div class="empty">${msg}</div>`;
+  }
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { themeMap(); syncControls(); renderList(); });
+new MutationObserver(() => { themeMap(); syncControls(); if (state.sel == null) renderList(); else renderDetail(BY_ID.get(state.sel)); })
+  .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+boot();
+</script>

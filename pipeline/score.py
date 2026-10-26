@@ -266,7 +266,8 @@ def main():
 
     tb = pa.Table.from_pylist(out)
     pq.write_table(tb, WORK / "routes_scored.parquet", compression="zstd")
-    pt = pa.Table.from_pylist([{**p, "geometry": shapely.to_wkb(p["geometry"])} for p in pois])
+    pt = pa.Table.from_pylist([{"kind": p["kind"], "name": p["name"], "ele": p.get("ele"), "area": p.get("area"),
+                                "geometry": shapely.to_wkb(p["geometry"])} for p in pois])
     pq.write_table(pt, WORK / "pois.parquet", compression="zstd")
     for col in ("foliage", "panorama", "lakes", "huts"):
         v = np.array(tb.column(col).to_pylist())
