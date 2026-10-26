@@ -19,9 +19,13 @@ a car park, a cable car or a bus stop, reaches a goal and comes back. So:
    going back the same way, the hike is a loop; otherwise it is out-and-back.
 5. Each hike is scored like the routes (foliage, panorama, lakes, huts); the
    best few per trailhead are kept and near-duplicates removed.
+6. Walks the trail bodies suggest (official.py: South Tyrol's suggested hikes,
+   SAT's trails from their start to their end) are always tried from the
+   nearest trailhead to the goal at their arrival point, and kept.
 
 Writes data/work/itineraries.parquet.
 """
+import json
 import multiprocessing as mp
 import re
 from collections import defaultdict
@@ -37,7 +41,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 from scipy.spatial import cKDTree
 
-from common import RAW, UTM, WORK
+from common import RAW, UTM, WORK, display_name
 from score import OPEN_DEG, Raster, clip01, walking_hours
 
 STEP = 25.0
@@ -57,6 +61,8 @@ LOOP_MAX_EXTRA_ROAD = 0.1             # extra share of asphalt a loop may add
 GOALS_PER_TRAILHEAD = 6
 KEEP_PER_TRAILHEAD = 2
 MIN_INSIDE = 0.7                      # share of a hike inside the region
+OFFICIAL_MAX_HOURS = 4.5              # one-way, for the walks the trail bodies suggest
+OFFICIAL_START, OFFICIAL_END = 800, 400   # m from their start to a trailhead, from their arrival to a goal
 GOAL_WEIGHT = {"rifugio": 1.0, "peak": 1.0, "lake": 1.0, "malga": 0.85, "bivacco": 0.75, "viewpoint": 0.7}
 DIFF_ORDER = {"T": 1, "E": 2, "EE": 3, "EEA": 4}
 
@@ -202,16 +208,6 @@ def node_xy(net):
     return xy
 
 
-def display_name(name):
-    """Pick the Italian form of bilingual South Tyrolean names ("Meran - Merano" -> "Merano")."""
-    if not name or " - " not in name:
-        return name
-    parts = [p.strip() for p in name.split(" - ")]
-    plain = [p for p in parts if not re.search(r"[äöüßëÄÖÜ]", p)] or parts
-    vowel = [p for p in plain if p[-1:].lower() in "aeiou"]
-    return (vowel or plain)[-1]
-
-
 def places(net, xy, tree):
     pois = pq.read_table(WORK / "pois.parquet").to_pylist()
     for p in pois:
@@ -280,7 +276,30 @@ def places(net, xy, tree):
             if node is None:
                 continue
         goals.append(dict(kind=kind, name=p["name"], node=node, poi=i, ele=p.get("ele")))
-    return kept, goals, pois
+    return kept, goals, pois, official_goals(kept, goals, pois)
+
+
+def official_goals(heads, goals, pois):
+    """Trailhead index -> goals of the walks the trail bodies suggest from there."""
+    path = WORK / "official.json"
+    if not path.exists():
+        return {}
+    doc = json.loads(path.read_text())
+    pairs = [(h["start"], h["end"]) for h in doc["lts"] if h["end"]]
+    pairs += [(t["coords"][0], t["coords"][-1]) for t in doc["sat"]]
+    head_tree = cKDTree([h["xy"] for h in heads])
+    goal_xy = np.array([shapely.get_coordinates(shapely.point_on_surface(pois[g["poi"]]["geometry"]))[0] for g in goals])
+    goal_tree = cKDTree(goal_xy)
+    out = defaultdict(list)
+    for start, end in pairs:
+        if np.hypot(*np.subtract(end, start)) < 500:
+            continue
+        dh, h = head_tree.query(start)
+        dg, g = goal_tree.query(end)
+        if dh <= OFFICIAL_START and dg <= OFFICIAL_END and goals[g] not in out[h]:
+            out[h].append(goals[g])
+    print(f"official walks: {sum(map(len, out.values()))} trailhead-goal pairs from {len(pairs)} suggested walks and SAT trails")
+    return out
 
 
 # --- 3. hikes ------------------------------------------------------------------------------------
@@ -304,7 +323,9 @@ def hikes_from(h_index):
     g, eid, net, goals_at = G["g"], G["eid"], G["net"], G["goals_at"]
     head = G["heads"][h_index]
     s = head["node"]
-    dist, pred = dijkstra(g, directed=True, indices=s, return_predecessors=True, limit=MAX_HOURS)
+    forced = G["official"].get(h_index, [])
+    dist, pred = dijkstra(g, directed=True, indices=s, return_predecessors=True,
+                          limit=OFFICIAL_MAX_HOURS if forced else MAX_HOURS)
     indptr, indices = g.indptr, g.indices
 
     def pos_of(a, b):
@@ -320,14 +341,24 @@ def hikes_from(h_index):
                 fit = 1 - abs(d - 1.8) / 3
                 cands.append((GOAL_WEIGHT[goal["kind"]] * fit, node, goal))
     cands.sort(key=lambda c: -c[0])
-    out, seen_goals = [], set()
+    official = {id(gl) for gl in forced}
+    todo, seen_goals = [], set()
+    for goal in forced:
+        if MIN_HOURS <= dist[goal["node"]] <= OFFICIAL_MAX_HOURS:
+            todo.append((goal["node"], goal))
+            seen_goals.add((goal["kind"], goal["name"] or goal["poi"]))
+    n_regular = 0
     for _, node, goal in cands:
-        if len(out) >= GOALS_PER_TRAILHEAD:
+        if n_regular >= GOALS_PER_TRAILHEAD:
             break
         key = (goal["kind"], goal["name"] or goal["poi"])
         if key in seen_goals:
             continue
         seen_goals.add(key)
+        todo.append((node, goal))
+        n_regular += 1
+    out = []
+    for node, goal in todo:
         go = path_edges(pred, s, node, pos_of)
         if not go:
             continue
@@ -345,7 +376,7 @@ def hikes_from(h_index):
             if shared / go_len > LOOP_MAX_OVERLAP:
                 back = None
         reverse = [pos_of(G["dst"][p], G["src"][p]) for p in go[::-1]]
-        out.append(dict(head=h_index, goal=goal, go=go, loop_back=back, reverse=reverse))
+        out.append(dict(head=h_index, goal=goal, go=go, loop_back=back, reverse=reverse, official=id(goal) in official))
     return out
 
 
@@ -393,13 +424,13 @@ def main():
     g, eid, src, dst = cost_graph(net)
     xy = node_xy(net)
     tree = cKDTree(xy)
-    heads, goals, pois = places(net, xy, tree)
+    heads, goals, pois, official = places(net, xy, tree)
     goals_at = defaultdict(list)
     for gl in goals:
         goals_at[gl["node"]].append(gl)
     print(f"{len(heads)} trailheads, {len(goals)} goals")
 
-    G.update(g=g, eid=eid, net=net, goals_at=goals_at, heads=heads, src=src, dst=dst)
+    G.update(g=g, eid=eid, net=net, goals_at=goals_at, heads=heads, src=src, dst=dst, official=official)
     with mp.get_context("fork").Pool(4) as pool:
         raw = [h for hs in pool.imap_unordered(hikes_from, range(len(heads)), chunksize=8) for h in hs]
     print(f"{len(raw)} candidate hikes")
@@ -448,13 +479,13 @@ def main():
             panorama=round(m["panorama"]), open_best=round(float(m["open_best"]), 3), lakes=round(lake_score),
             lake_names=lakes, n_lakes=n_lakes, huts=round(hut_score), rifugi=huts["rifugio"], malghe=huts["malga"],
             bivacchi=huts["bivacco"], peaks=[p[0] for p in peaks], peak_ele=[p[1] for p in peaks],
-            poi_ids=sorted({int(i) for v in near.values() for i in v}), quality=round(quality, 1),
+            poi_ids=sorted({int(i) for v in near.values() for i in v}), quality=round(quality, 1), official=h["official"],
             edges=m["edges"].tolist(), geometry=shapely.to_wkb(shapely.simplify(line, 2.0)),
         ))
     print(f"{len(rows)} hikes after length limits")
 
-    # Per trailhead: the best overall and the best for each criterion; then drop
-    # near-duplicates (same goal, mostly the same path).
+    # Per trailhead: the best overall, the best for each criterion and the official walks; then drop
+    # near-duplicates (same goal, mostly the same path), official walks first.
     by_head = defaultdict(list)
     for r in rows:
         by_head[r["head"]].append(r)
@@ -465,8 +496,9 @@ def main():
             best = max(hs, key=lambda r: (r[crit], r["quality"]))
             if best[crit] > 0:
                 pick.append(best)
+        pick += [r for r in hs if r["official"]]
         kept += list({id(r): r for r in pick}.values())
-    kept.sort(key=lambda r: -r["quality"])
+    kept.sort(key=lambda r: (not r["official"], -r["quality"]))
     final, by_goal = [], defaultdict(list)
     for r in kept:
         es = set(r["edges"])
@@ -481,7 +513,8 @@ def main():
     tb = pa.Table.from_pylist(final)
     pq.write_table(tb, WORK / "itineraries.parquet", compression="zstd")
     loops = sum(r["kind"] == "loop" for r in final)
-    print(f"itineraries.parquet: {len(final)} hikes ({loops} loops), from {len(by_head)} trailheads")
+    official = sum(r["official"] for r in final)
+    print(f"itineraries.parquet: {len(final)} hikes ({loops} loops, {official} official walks), from {len(by_head)} trailheads")
 
 
 if __name__ == "__main__":

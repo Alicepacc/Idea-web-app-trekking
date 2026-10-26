@@ -9,7 +9,8 @@ Writes to data/raw/:
   orchards.parquet    orchards and vineyards (excluded from the foliage index)
   huts.parquet        mountain huts, bivouacs and alpine pastures (by name)
   boundary.parquet    Trentino-Alto Adige/Suedtirol region polygon
-  localities.parquet  towns and villages, for "start from" searches
+  localities.parquet  towns, villages and hamlets, for "start from" searches and map labels
+  landforms.parquet   named valleys, mountain ranges and glaciers, for map labels
 """
 import re
 
@@ -125,10 +126,18 @@ def boundary_and_localities():
         region = tb.filter(pc.match_substring(tb.column("name"), "Trentino"))
     save(region.select(["id", "name", "region", "geometry"]), "boundary.parquet")
 
-    tb = read_overture("divisions", "division", ["id", "names", "subtype", "country", "population", "geometry"],
+    tb = read_overture("divisions", "division", ["id", "names", "subtype", "class", "country", "population", "geometry"],
                        row_filter=lambda t: pc.is_in(t.column("subtype"), pa.array(["locality", "localadmin"])))
-    save(tb.select(["id", "subtype", "population", "geometry"]).append_column("name", primary_name(tb)),
+    save(tb.select(["id", "subtype", "class", "population", "geometry"]).append_column("name", primary_name(tb)),
          "localities.parquet")
+
+
+def landforms():
+    """Valleys (mostly lines along the valley floor), mountain ranges and glaciers (areas)."""
+    tb = read_overture("base", "land", ["id", "names", "class", "geometry"],
+                       row_filter=lambda t: pc.and_(pc.is_in(t.column("class"), pa.array(["valley", "mountain_range", "glacier"])),
+                                                    pc.is_valid(t.column("names"))))
+    save(tb.select(["id", "class", "geometry"]).append_column("name", primary_name(tb)), "landforms.parquet")
 
 
 if __name__ == "__main__":
@@ -139,3 +148,4 @@ if __name__ == "__main__":
     farmland_trees()
     huts()
     boundary_and_localities()
+    landforms()

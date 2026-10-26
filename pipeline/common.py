@@ -87,6 +87,31 @@ def grid():
     return from_origin(xmin, ymax, GRID_RES, GRID_RES), width, height
 
 
+def display_name(name):
+    """Pick the Italian form of bilingual South Tyrolean names ("Meran - Merano" -> "Merano")."""
+    if not name or " - " not in name:
+        return name
+    parts = [p.strip() for p in name.split(" - ")]
+    plain = [p for p in parts if not re.search(r"[äöüßëÄÖÜ]", p)] or parts
+    vowel = [p for p in plain if p[-1:].lower() in "aeiou"]
+    return (vowel or plain)[-1]
+
+
+def encode_polyline(coords):
+    """Google polyline encoding, precision 1e-5 (lon/lat pairs in, lat-first out)."""
+    out, prev = [], (0, 0)
+    for lon, lat in coords:
+        cur = (int(round(lat * 1e5)), int(round(lon * 1e5)))
+        for v in (cur[0] - prev[0], cur[1] - prev[1]):
+            v = ~(v << 1) if v < 0 else v << 1
+            while v >= 0x20:
+                out.append(chr((0x20 | (v & 0x1F)) + 63))
+                v >>= 5
+            out.append(chr(v + 63))
+        prev = cur
+    return "".join(out)
+
+
 # --- Overture Maps -----------------------------------------------------------
 
 def _bbox_mask(tb: pa.Table, bbox) -> pa.ChunkedArray:

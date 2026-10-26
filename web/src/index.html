@@ -120,6 +120,8 @@ details.filters[open] > summary::after { content: "–"; }
 .pill.fair { color: var(--warn); background: var(--warn-soft); }
 .pill.bad { color: var(--bad); background: var(--bad-soft); }
 .pill.snow { color: var(--lake); background: color-mix(in srgb, var(--lake) 14%, transparent); }
+.pill.off { color: var(--ink); background: var(--chip); }
+.pill.off::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
 .pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 
 .detail { display: grid; gap: 16px; }
@@ -261,6 +263,7 @@ details.filters[open] > summary::after { content: "–"; }
             <label><input type="checkbox" id="f-loop"> Solo anelli</label>
             <label><input type="checkbox" id="f-family"> Adatte alle famiglie</label>
             <label><input type="checkbox" id="f-bus"> Partenza da una fermata dell'autobus</label>
+            <label><input type="checkbox" id="f-official"> Solo itinerari ufficiali: sentieri SAT o proposte delle associazioni turistiche</label>
           </div>
         </div>
       </details>
@@ -279,12 +282,16 @@ details.filters[open] > summary::after { content: "–"; }
         raggiunge una meta (rifugio, malga, cima, lago o punto panoramico) e torna con un anello quando esiste una via diversa
         non troppo più lunga, altrimenti per la stessa strada. Il foliage confronta l'ultima immagine Sentinel-2 senza nuvole
         con la più verde dell'estate: conta come "in colore" un albero virato al giallo-arancio con le foglie ancora sui rami.
-        Panorami: quanto è libero l'orizzonte e quali cime si vedono, calcolato sul modello del terreno.</p>
+        Panorami: quanto è libero l'orizzonte e quali cime si vedono, calcolato sul modello del terreno.
+        Gli itinerari proposti dalle associazioni turistiche dell'Alto Adige e i sentieri della SAT vengono sempre provati
+        e segnalati come ufficiali.</p>
       <p><b>Limiti.</b> Foliage e neve sono stime da satellite a 20 m; tempi e dislivelli sono calcolati, non misurati; il meteo è
         una previsione automatica. Prima di partire controlla bollettini, aperture dei rifugi e stato dei sentieri.</p>
       <p>Dati: © OpenStreetMap contributors (ODbL), Overture Maps Foundation, Copernicus Sentinel-2 (2026) e Copernicus DEM,
         ESA WorldCover 2021, meteo <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0),
-        webcam <a href="https://www.foto-webcam.eu/" target="_blank" rel="noopener">foto-webcam.eu</a>, foto Wikimedia Commons (autori e licenze nelle schede).</p>
+        webcam <a href="https://www.foto-webcam.eu/" target="_blank" rel="noopener">foto-webcam.eu</a>, foto Wikimedia Commons (autori e licenze nelle schede),
+        sentieri <a href="https://www.sat.tn.it/sentieri/" target="_blank" rel="noopener">© SAT</a> (ODbL), itinerari delle associazioni turistiche
+        dall'<a href="https://opendatahub.com/" target="_blank" rel="noopener">Open Data Hub</a> dell'Alto Adige (CC0), caratteri Barlow (OFL).</p>
     </footer>
   </aside>
 
@@ -340,10 +347,10 @@ const EMPTY_PNG = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1
 
 const state = {
   preset: "foliage", w: { ...PRESETS.foliage.w }, day: 0,
-  f: { hours: 9, up: 2000, diff: [...DEFAULT_DIFF], snow: true, dry: false, loop: false, family: false, bus: false, near: "", radius: 20 },
+  f: { hours: 9, up: 2000, diff: [...DEFAULT_DIFF], snow: true, dry: false, loop: false, family: false, bus: false, official: false, near: "", radius: 20 },
   shown: PAGE, sel: null,
 };
-let HIKES = [], BY_ID = new Map(), POIS = [], PLACES = new Map(), INFO = {}, TILES = null;
+let HIKES = [], BY_ID = new Map(), POIS = [], PLACES = new Map(), INFO = {}, TILES = null, LABELS = null, GLYPHS = {};
 let map = null, mapReady = false, ranked = [], markers = [], hoverPopup = null, hoverId = null;
 const PACKS = new Map(), DETAILS = new Map();
 
@@ -433,9 +440,46 @@ function passes(r, place) {
   if (f.loop && r.kind !== "loop") return false;
   if (f.family && !r.fam) return false;
   if (f.bus && r.hk !== "bus") return false;
+  if (f.official && !officialKind(r)) return false;
   if (f.dry) { const w = wxDay(r, state.day); if (w && (w.cls === "bad" || (w.prec ?? 0) >= 1)) return false; }
   if (place && km(r.st, place) > f.radius) return false;
   return true;
+}
+// Official sources: r.of = [share on SAT trails, [[trail, share of the hike, share of the trail walked]], [suggested hikes]]
+const SAT_SHARE = 0.7;
+function officialKind(r) {
+  if (!r.of) return null;
+  if (r.of[2].length) return "lts";
+  return r.of[0] >= SAT_SHARE ? "sat" : null;
+}
+function suggested(r) { return r.of ? r.of[2].map(i => INFO.lts[i]) : []; }
+function officialPill(r) {
+  const k = officialKind(r);
+  if (k === "lts") {
+    const closed = suggested(r).some(h => !h[4]);
+    return `<span class="pill off">proposta ufficiale</span>${closed ? '<span class="pill bad">segnalata chiusa</span>' : ""}`;
+  }
+  return k === "sat" ? '<span class="pill off">sentieri SAT</span>' : "";
+}
+function officialSection(r) {
+  if (!r.of) return "";
+  const items = [];
+  for (const [title, assoc, url, themes, open, changed] of suggested(r)) {
+    items.push(`<li>Proposta ${assoc ? `dall'associazione turistica ${esc(assoc)}` : "da un'associazione turistica dell'Alto Adige"}:
+      «${esc(title)}»${themes.length ? ` (${esc(themes.join(", "))})` : ""}.${url ? ` <a href="${esc(url)}" target="_blank" rel="noopener">Sito dell'associazione</a>` : ""}
+      ${open ? "" : `<br><b>L'associazione la segnala come chiusa</b> (dato aggiornato il ${esc(dateOf(changed).toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" }))}).`}</li>`);
+  }
+  const trails = r.of[1].filter(([, share]) => share >= 0.1).map(([i, share, whole]) => {
+    const [ref, name, from, to, diff, tGo, tBack, maint] = INFO.sat[i];
+    const times = whole >= 0.8 && tGo ? ` · tempi SAT ${hours(tGo)} da ${esc(from)}${tBack ? `, ${hours(tBack)} al ritorno` : ""}` : "";
+    return `<div><dt>${esc(ref)}</dt><dd>${name ? `${esc(name)}: ` : ""}${esc(from)} → ${esc(to)} · ${esc(diff)}${times}${maint ? ` · curato da ${esc(maint)}` : ""}
+      · <a href="https://sentieri.sat.tn.it/schede-sentieri?numero=${encodeURIComponent(ref)}" target="_blank" rel="noopener">scheda SAT</a></dd></div>`;
+  });
+  if (r.of[0] >= 0.3) items.push(`<li>Il ${pct(r.of[0])} del percorso è su sentieri curati dalla SAT${trails.length ? ":" : "."}</li>`);
+  if (!items.length) return "";
+  return `<section><div class="label">Fonti ufficiali</div><ul class="why">${items.join("")}</ul>
+    ${r.of[0] >= 0.3 && trails.length ? `<dl class="along">${trails.join("")}</dl>` : ""}
+    <p class="hint">Sentieri © SAT (ODbL); proposte delle associazioni turistiche dall'Open Data Hub dell'Alto Adige (CC0). Le descrizioni complete sono sui loro siti.</p></section>`;
 }
 function reasons(r) {
   const out = [];
@@ -480,7 +524,7 @@ function buildControls() {
     state.f[key] = conv(e.target.type === "checkbox" ? e.target.checked : e.target.value); syncControls(); update();
   });
   bind("f-hours", "hours", Number); bind("f-up", "up", Number);
-  for (const k of ["snow", "dry", "loop", "family", "bus"]) bind(`f-${k}`, k, Boolean, "change");
+  for (const k of ["snow", "dry", "loop", "family", "bus", "official"]) bind(`f-${k}`, k, Boolean, "change");
   bind("f-radius", "radius", Number, "change"); bind("f-near", "near", String, "change");
   document.getElementById("f-near").addEventListener("input", e => { if (!e.target.value) { state.f.near = ""; syncControls(); update(); } });
   document.getElementById("more").addEventListener("click", () => { state.shown += PAGE; renderList(); paintMap(); });
@@ -504,11 +548,11 @@ function syncControls() {
   document.getElementById("f-up").value = f.up;
   document.getElementById("o-up").textContent = f.up >= 2000 ? "qualsiasi" : `fino a ${fmt0.format(f.up)} m`;
   document.querySelectorAll("#diffs input").forEach(i => i.checked = f.diff.includes(i.value));
-  for (const k of ["snow", "dry", "loop", "family", "bus"]) document.getElementById(`f-${k}`).checked = f[k];
+  for (const k of ["snow", "dry", "loop", "family", "bus", "official"]) document.getElementById(`f-${k}`).checked = f[k];
   document.getElementById("f-radius").value = String(f.radius);
   const near = document.getElementById("f-near"); if (document.activeElement !== near) near.value = f.near;
   const diffChanged = f.diff.length !== DEFAULT_DIFF.length || DEFAULT_DIFF.some(d => !f.diff.includes(d));
-  const n = (f.hours < 9) + (f.up < 2000) + diffChanged + f.dry + f.loop + f.family + f.bus + !!nearPlace();
+  const n = (f.hours < 9) + (f.up < 2000) + diffChanged + f.dry + f.loop + f.family + f.bus + f.official + !!nearPlace();
   document.getElementById("nfilters").textContent = n ? `· ${n} attivi` : "";
 }
 
@@ -549,7 +593,7 @@ function renderList() {
         <span class="card-sub">${esc(subtitle(r))}${dist}</span>
         <span class="card-meta">${fmt1.format(r.km)} km · ↑ ${fmt0.format(r.up)} m · ${hours(r.h)} · max ${fmt0.format(r.emax)} m · ${diffOf(r) === "?" ? "diff. n.d." : diffOf(r)}</span>
         ${why.length ? `<span class="card-why">${esc(why.join(" · "))}</span>` : ""}
-        <span class="pills">${wxPill(r, state.day)}${snow}</span></span>
+        <span class="pills">${wxPill(r, state.day)}${snow}${officialPill(r)}</span></span>
       <span class="card-score"><b>${Math.round(r._s)}</b><span class="bars" aria-hidden="true">${bars}</span></span></button>`;
   }).join("");
   document.getElementById("more").hidden = state.shown >= ranked.length;
@@ -621,6 +665,7 @@ function renderDetail(r) {
   if (r.road > 0.25) warn.push(`Circa il ${pct(r.road)} del percorso è su strade asfaltate o carrozzabili.`);
   if (r.seen < 0.7) warn.push(`Solo il ${pct(r.seen)} del percorso ha immagini chiare recenti: la stima del foliage è meno affidabile.`);
   if (r.marked < 0.4) warn.push("Buona parte del percorso è fuori dai sentieri numerati: controlla la traccia sulla mappa.");
+  if (suggested(r).some(h => !h[4])) warn.push("Un'associazione turistica segnala questo itinerario come chiuso: verifica prima di partire.");
   const along = [];
   if (r.hr.length) along.push(["Rifugi", r.hr.join(", ")]);
   if (r.hm.length) along.push(["Malghe", r.hm.join(", ")]);
@@ -649,6 +694,7 @@ function renderDetail(r) {
     <div class="profile">${profileSVG(r)}</div>
     <section><div class="label">Perché te la proponiamo</div><ul class="why">${why.map(w => `<li>${esc(w)}</li>`).join("")}</ul></section>
     ${warn.length ? `<p class="caveat">${warn.map(esc).join(" ")}</p>` : ""}
+    ${officialSection(r)}
     ${along.length ? `<section><div class="label">Lungo il percorso</div><dl class="along">${along.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl></section>` : ""}
     ${cams ? `<section><div class="label">Webcam</div><div class="cams">${cams}</div><p class="hint">Le immagini sono sui siti dei gestori delle webcam.</p></section>` : ""}
     <div class="links">
@@ -657,10 +703,24 @@ function renderDetail(r) {
     </div>
     <p class="hint">Tempo calcolato con la regola DIN 33466 dei club alpini (4 km/h in piano, 300 m/h in salita, 500 m/h in discesa), soste escluse.</p>`;
   document.getElementById("back").addEventListener("click", () => select(null));
-  if (r.ph) loadPack("photos", r.ph[0]).then(buf => {
-    const img = document.getElementById("photo");
-    if (img && state.sel === r.id) img.src = URL.createObjectURL(new Blob([buf.slice(r.ph[1], r.ph[1] + r.ph[2])], { type: "image/webp" }));
-  }).catch(() => { const f = document.querySelector(".photo"); if (f) f.hidden = true; });
+  if (r.ph) showPhoto(r);
+}
+// The thumbnail shipped with the page when there is one; otherwise the picture from Wikimedia,
+// trying smaller sizes (a picture narrower than a size has no thumbnail at that size), then the original.
+function showPhoto(r) {
+  const img = document.getElementById("photo");
+  const hide = () => { const f = document.querySelector(".photo"); if (f && state.sel === r.id) f.hidden = true; };
+  const path = r.ph[6], name = path.split("/").pop();
+  const urls = [500, 330, 250].map(w => `https://upload.wikimedia.org/wikipedia/commons/thumb/${path}/${w}px-${name}`)
+    .concat(`https://upload.wikimedia.org/wikipedia/commons/${path}`);
+  const remote = () => {
+    img.onerror = () => { if (urls.length) img.src = urls.shift(); else hide(); };
+    img.src = urls.shift();
+  };
+  if (r.ph[0]) loadPack("photos", r.ph[0]).then(buf => {
+    if (state.sel === r.id) img.src = URL.createObjectURL(new Blob([buf.slice(r.ph[1], r.ph[1] + r.ph[2])], { type: "image/webp" }));
+  }).catch(remote);
+  else remote();
 }
 function select(id, fly) {
   state.sel = id;
@@ -682,6 +742,121 @@ function select(id, fly) {
   }
 }
 
+/* ---------- map labels ---------- */
+// Place names drawn by MapLibre from labels.json; the most important come first and win crowded spots.
+const LABEL_FONT = { b: ["Barlow Condensed SemiBold"], m: ["Barlow Condensed Medium"], i: ["Barlow Condensed Medium Italic"] };
+const ICON_KINDS = ["city", "town", "village", "peak", "pass", "rifugio", "bivacco", "malga"];
+const TEXT_KINDS = ["hamlet", "lake", "glacier", "range", "valley"];
+const LABEL_INK = {
+  light: { place: "#1f2b27", peak: "#4b3527", pass: "#36423e", hut: "#8f2f17", water: "#1d5c88", land: "#65583f", halo: "rgba(246,248,244,0.92)", dot: "#ffffff" },
+  dark: { place: "#e6ece8", peak: "#ead9c8", pass: "#d2dbd7", hut: "#f2a986", water: "#93c9e8", land: "#d2c4a8", halo: "rgba(13,19,17,0.9)", dot: "#1b2421" },
+};
+function labelInk() { return LABEL_INK[isDark() ? "dark" : "light"]; }
+function byKind(c) {
+  return ["match", ["get", "k"], ["city", "town", "village", "hamlet"], c.place, "peak", c.peak, "pass", c.pass,
+    ["rifugio", "bivacco", "malga"], c.hut, ["lake", "glacier"], c.water, ["range", "valley"], c.land, c.place];
+}
+function labelFont() {
+  return ["match", ["get", "k"], ["city", "town", "range"], ["literal", LABEL_FONT.b], ["lake", "glacier", "valley"], ["literal", LABEL_FONT.i], ["literal", LABEL_FONT.m]];
+}
+function labelSize(big) {
+  const at = z => ["match", ["get", "k"], "city", 15 + z, "town", 13 + z, "village", 12 + z * 0.6, "range", 12.5 + z * 0.4,
+    "lake", ["case", ["<=", ["coalesce", ["get", "z"], 12], 9], 13.5 + z * 0.6, 11.5 + z * 0.5], "rifugio", 11.5 + z * 0.5, 11 + z * 0.4];
+  return ["interpolate", ["linear"], ["zoom"], 7, at(0 + big), 13, at(2.5 + big)];
+}
+// Peaks and passes carry their elevation on a second, smaller line.
+const LABEL_TEXT = ["case", ["has", "e"],
+  ["format", ["get", "n"], {}, "\n", {}, ["to-string", ["get", "e"]], { "font-scale": 0.82 }],
+  ["format", ["get", "n"], {}]];
+function short(name) { return name.replace(/^Rifugio\b/, "Rif.").replace(/^Bivacco\b/, "Biv."); }
+function labelIcons(c) {
+  const draw = (w, h, paint) => {
+    const k = 2, cv = document.createElement("canvas");
+    cv.width = w * k; cv.height = h * k;
+    const x = cv.getContext("2d"); x.scale(k, k); x.lineJoin = "round"; paint(x);
+    return { width: w * k, height: h * k, data: new Uint8Array(x.getImageData(0, 0, w * k, h * k).data.buffer) };
+  };
+  const dot = (r, fill, stroke, lw) => x => { x.beginPath(); x.arc(r + 1, r + 1, r, 0, 2 * Math.PI); x.fillStyle = fill; x.fill(); if (stroke) { x.lineWidth = lw; x.strokeStyle = stroke; x.stroke(); } };
+  return {
+    city: draw(12, 12, dot(4.6, c.dot, c.place, 1.8)),
+    town: draw(10, 10, dot(3.6, c.dot, c.place, 1.5)),
+    village: draw(7, 7, dot(2.4, c.place, c.halo, 1)),
+    peak: draw(11, 10, x => { x.beginPath(); x.moveTo(5.5, 1); x.lineTo(10, 9); x.lineTo(1, 9); x.closePath(); x.lineWidth = 1.6; x.strokeStyle = c.halo; x.stroke(); x.fillStyle = c.peak; x.fill(); }),
+    pass: draw(13, 11, x => { x.lineWidth = 1.7; x.strokeStyle = c.pass; x.lineCap = "round";
+      x.beginPath(); x.arc(-1.5, 5.5, 5.6, -0.85, 0.85); x.stroke(); x.beginPath(); x.arc(14.5, 5.5, 5.6, Math.PI - 0.85, Math.PI + 0.85); x.stroke(); }),
+    rifugio: draw(11, 11, x => { x.beginPath(); x.moveTo(5.5, 1); x.lineTo(10, 5); x.lineTo(10, 10); x.lineTo(1, 10); x.lineTo(1, 5); x.closePath();
+      x.lineWidth = 1.6; x.strokeStyle = c.halo; x.stroke(); x.fillStyle = c.hut; x.fill(); }),
+    bivacco: draw(11, 10, x => { x.beginPath(); x.moveTo(5.5, 1.5); x.lineTo(10, 9); x.lineTo(1, 9); x.closePath(); x.lineWidth = 1.5; x.fillStyle = c.halo; x.fill(); x.strokeStyle = c.hut; x.stroke(); }),
+    malga: draw(9, 9, dot(3.2, c.hut, c.halo, 1.2)),
+    lake: draw(9, 9, dot(3.2, c.water, c.halo, 1.2)),
+    viewpoint: draw(9, 9, dot(3.2, css("--sky"), c.halo, 1.2)),
+  };
+}
+function setLabelIcons() {
+  for (const [name, img] of Object.entries(labelIcons(labelInk()))) {
+    if (map.hasImage(name)) map.updateImage(name, img); else map.addImage(name, img, { pixelRatio: 2 });
+  }
+}
+function labelFeatures() {
+  const pts = LABELS.p.map(([k, n, lon, lat, z, e, p], i) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] },
+    properties: Object.assign({ k, n: short(n), z, s: i, p: p ?? -1 }, e != null && (k === "peak" || k === "pass") ? { e } : {}) }));
+  const lines = LABELS.l.map(([k, n, z, g]) => ({ type: "Feature", geometry: { type: "LineString", coordinates: decode(g) }, properties: { k, n, z } }));
+  return [pts, lines];
+}
+function addLabels() {
+  if (!LABELS) return;
+  const [pts, lines] = labelFeatures();
+  map.addSource("labels", { type: "geojson", data: { type: "FeatureCollection", features: pts } });
+  map.addSource("valleys", { type: "geojson", data: { type: "FeatureCollection", features: lines } });
+  map.addSource("hike-labels", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  setLabelIcons();
+  const shown = [">=", ["zoom"], ["get", "z"]];
+  const halo = { "text-halo-width": 1.6, "text-halo-blur": 0.4 };
+  map.addLayer({ id: "lbl-valley", type: "symbol", source: "valleys", filter: shown, layout: {
+    "symbol-placement": "line", "text-field": ["get", "n"], "text-font": ["literal", LABEL_FONT.i],
+    "text-size": ["interpolate", ["linear"], ["zoom"], 9, 11.5, 13, 13.5], "text-letter-spacing": 0.14,
+    "text-max-angle": 40, "symbol-spacing": 380, "text-padding": 2 }, paint: halo });
+  map.addLayer({ id: "lbl-text", type: "symbol", source: "labels", filter: ["all", ["in", ["get", "k"], ["literal", TEXT_KINDS]], shown,
+    ["any", ["!=", ["get", "k"], "range"], ["<", ["zoom"], 11.5]]], layout: {
+    "text-field": ["get", "n"], "text-font": labelFont(), "text-size": labelSize(0), "symbol-sort-key": ["get", "s"],
+    "text-transform": ["match", ["get", "k"], "range", "uppercase", "none"],
+    "text-letter-spacing": ["match", ["get", "k"], "range", 0.2, 0.02], "text-max-width": 8, "text-padding": 3 }, paint: halo });
+  map.addLayer({ id: "lbl-icon", type: "symbol", source: "labels", filter: ["all", ["in", ["get", "k"], ["literal", ICON_KINDS]], shown], layout: {
+    "icon-image": ["get", "k"], "text-field": LABEL_TEXT, "text-font": labelFont(), "text-size": labelSize(0),
+    "text-variable-anchor": ["left", "right", "top", "bottom"], "text-radial-offset": 0.62, "text-justify": "auto",
+    "text-line-height": 1.05, "text-max-width": 9, "text-padding": 3, "icon-padding": 1, "symbol-sort-key": ["get", "s"],
+    "text-letter-spacing": ["match", ["get", "k"], ["city", "town"], 0.04, 0.01] }, paint: halo });
+  map.addLayer({ id: "lbl-hike", type: "symbol", source: "hike-labels", layout: {
+    "icon-image": ["get", "k"], "text-field": LABEL_TEXT, "text-font": ["literal", LABEL_FONT.b], "text-size": labelSize(1.5),
+    "text-variable-anchor": ["left", "right", "top", "bottom"], "text-radial-offset": 0.65, "text-justify": "auto",
+    "text-line-height": 1.05, "text-max-width": 9, "text-padding": 2, "symbol-sort-key": ["get", "s"] }, paint: { ...halo, "text-halo-width": 2 } });
+  themeLabels();
+}
+function themeLabels() {
+  if (!map.getLayer("lbl-icon")) return;
+  const c = labelInk();
+  setLabelIcons();
+  for (const id of ["lbl-valley", "lbl-text", "lbl-icon", "lbl-hike"]) {
+    map.setPaintProperty(id, "text-halo-color", c.halo);
+    map.setPaintProperty(id, "text-color", id === "lbl-hike" ? ["case", ["boolean", ["get", "goal"], false], css("--trail"), byKind(c)] : byKind(c));
+  }
+  map.setPaintProperty("lbl-valley", "text-color", c.land);
+}
+// The selected hike's huts, lakes and peaks: always labelled, in bold, and not repeated by the general layers.
+function showHikeLabels(r) {
+  if (!map.getSource("hike-labels")) return;
+  const ids = r ? (r.pi || []) : [];
+  const feats = ids.map(i => [i, POIS[i]]).filter(([, p]) => p && p[1]).map(([i, p], n) => ({ type: "Feature",
+    geometry: { type: "Point", coordinates: [p[2], p[3]] },
+    properties: Object.assign({ k: p[0] === "saddle" ? "pass" : p[0], n: short(p[1]),
+      goal: i === r.gp, s: i === r.gp ? -1 : n }, p[4] && (p[0] === "peak" || p[0] === "saddle") ? { e: p[4] } : {}) }));
+  map.getSource("hike-labels").setData({ type: "FeatureCollection", features: feats });
+  const keep = ["!", ["in", ["get", "p"], ["literal", ids]]];
+  map.setFilter("lbl-icon", ["all", ["in", ["get", "k"], ["literal", ICON_KINDS]], [">=", ["zoom"], ["get", "z"]], keep]);
+  map.setFilter("lbl-text", ["all", ["in", ["get", "k"], ["literal", TEXT_KINDS]], [">=", ["zoom"], ["get", "z"]],
+    ["any", ["!=", ["get", "k"], "range"], ["<", ["zoom"], 11.5]], keep]);
+}
+
 /* ---------- map ---------- */
 function isDark() {
   const t = document.documentElement.getAttribute("data-theme");
@@ -697,10 +872,18 @@ function themeMap() {
   }
   map.setPaintProperty("sel-casing", "line-color", dark ? "#111715" : "#ffffff");
   map.setPaintProperty("sel-line", "line-color", css("--trail"));
+  themeLabels();
 }
 function initMap() {
   const b = INFO.bbox;
   maplibregl.addProtocol("pk", async params => {
+    const g = params.url.match(/^pk:\/\/glyphs\/([^/]+)\/(\d+-\d+)/);
+    if (g) {
+      const e = GLYPHS[`${decodeURIComponent(g[1])}/${g[2]}`];
+      if (!e) return { data: new ArrayBuffer(0) };
+      const buf = await loadPack("glyphs", "glyphs");
+      return { data: buf.slice(e[0], e[0] + e[1]) };
+    }
     const m = params.url.match(/^pk:\/\/(\w+)\/(\d+)\/(\d+)\/(\d+)/);
     const e = m && TILES.layers[m[1]] && TILES.layers[m[1]][`${m[2]}/${m[3]}/${m[4]}`];
     if (!e) return { data: EMPTY_PNG.slice(0) };
@@ -711,10 +894,10 @@ function initMap() {
     container: "map", attributionControl: false, maxZoom: 14.5, minZoom: 7,
     bounds: [[10.38, 45.66], [12.48, 47.09]], fitBoundsOptions: { padding: 16 },
     maxBounds: [[b[0] - 0.6, b[1] - 0.4], [b[2] + 0.6, b[3] + 0.4]],
-    style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": css("--paper") } }] },
+    style: { version: 8, glyphs: "pk://glyphs/{fontstack}/{range}", sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": css("--paper") } }] },
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
-  map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap contributors · Overture Maps · Copernicus Sentinel-2 2026, Copernicus DEM · ESA WorldCover" }), "bottom-right");
+  map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap contributors · © SAT (ODbL) · Overture Maps · Copernicus Sentinel-2 2026, Copernicus DEM · ESA WorldCover" }), "bottom-right");
   map.once("idle", () => document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"));
   map.on("load", () => {
     for (const [id, vis, op] of [["base", "visible", 1], ["satellite", "none", 1], ["foliage", "visible", 0.8], ["snow", "visible", 0.85]]) {
@@ -733,7 +916,8 @@ function initMap() {
     map.addLayer({ id: "hover", type: "line", source: "hikes", filter: ["==", ["id"], -1], layout: { "line-cap": "round" }, paint: { "line-color": css("--trail"), "line-width": 4, "line-opacity": 0.8 } });
     map.addLayer({ id: "sel-casing", type: "line", source: "hikes", filter: ["==", ["id"], -1], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 5, 14, 10] } });
     map.addLayer({ id: "sel-line", type: "line", source: "hikes", filter: ["==", ["id"], -1], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": css("--trail"), "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 14, 5] } });
-    map.addLayer({ id: "hit", type: "line", source: "hikes", paint: { "line-color": "#000", "line-opacity": 0, "line-width": 12 } });
+    addLabels();
+    map.addLayer({ id: "hit", type: "line", source: "hikes", paint: { "line-color": "#000", "line-opacity": 0, "line-width": 12 } }, map.getLayer("lbl-valley") ? "lbl-valley" : undefined);
     hoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
     map.on("mousemove", "hit", e => {
       const f = pick(e.features); if (!f) return;
@@ -747,8 +931,10 @@ function initMap() {
     document.querySelectorAll('input[name="bg"]').forEach(i => i.addEventListener("change", () =>
       map.setLayoutProperty("satellite", "visibility", document.querySelector('input[name="bg"]:checked').value === "satellite" ? "visible" : "none")));
     for (const id of ["foliage", "snow"]) document.getElementById(`l-${id}`).addEventListener("change", e => map.setLayoutProperty(id, "visibility", e.target.checked ? "visible" : "none"));
-    const towns = (INFO.towns || []).slice(0, matchMedia("(max-width: 860px)").matches ? 9 : 40);
-    for (const [name, lon, lat] of towns) { const el = document.createElement("div"); el.className = "town"; el.textContent = name; new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map); }
+    if (!LABELS) {
+      const towns = (INFO.towns || []).slice(0, matchMedia("(max-width: 860px)").matches ? 9 : 40);
+      for (const [name, lon, lat] of towns) { const el = document.createElement("div"); el.className = "town"; el.textContent = name; new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map); }
+    }
     mapReady = true;
     document.getElementById("loading").hidden = true;
     themeMap(); paintMap();
@@ -784,8 +970,9 @@ function hover(id, fromMap) {
 function marker(el, lngLat, anchor = "center", offset = [0, 0]) { const m = new maplibregl.Marker({ element: el, anchor, offset }).setLngLat(lngLat).addTo(map); markers.push(m); }
 function showMarkers(r) {
   markers.forEach(m => m.remove()); markers = [];
+  showHikeLabels(r);
   if (!r) return;
-  for (const i of (r.pi || []).slice(0, 18)) {
+  for (const i of map.getSource("hike-labels") ? [] : (r.pi || []).slice(0, 18)) {
     const p = POIS[i]; if (!p) continue;
     const el = document.createElement("div");
     el.className = `poi ${p[0]}${i === r.gp ? " goal" : ""}`;
@@ -803,6 +990,9 @@ async function boot() {
   try {
     const [hd, pois, tiles] = await Promise.all(["data/hikes.json", "data/pois.json", "data/tiles/index.json"].map(p => fetch(p).then(x => { if (!x.ok) throw new Error(p); return x.json(); })));
     INFO = hd; HIKES = hd.hikes; POIS = pois; TILES = tiles;
+    // place names are a bonus: without them the map still works
+    [LABELS, GLYPHS] = await Promise.all(["data/labels.json", "data/glyphs/index.json"].map(p => fetch(p).then(x => x.ok ? x.json() : null).catch(() => null)));
+    if (!LABELS || !GLYPHS) { LABELS = null; GLYPHS = {}; }
     for (const r of HIKES) BY_ID.set(r.id, r);
     for (const [name, lon, lat] of hd.places || []) PLACES.set(name.toLowerCase(), [lon, lat]);
     document.getElementById("places").innerHTML = (hd.places || []).map(p => `<option value="${esc(p[0])}"></option>`).join("");

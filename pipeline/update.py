@@ -14,24 +14,28 @@ import sys
 import time
 from pathlib import Path
 
-from common import RAW, WORK
+from common import RAW, WEB_DATA, WORK
 
 PY = sys.executable
 HERE = Path(__file__).resolve().parent
 
 # (script, args, outputs that make it skippable when --all is not given)
 STABLE = [
-    ("fetch_overture.py", [], [RAW / "segments.parquet", RAW / "orchards.parquet", RAW / "boundary.parquet"]),
+    ("fetch_overture.py", [], [RAW / "segments.parquet", RAW / "orchards.parquet", RAW / "boundary.parquet",
+                               RAW / "landforms.parquet"]),
     ("fetch_osm_routes.py", [], [RAW / "osm_routes.parquet"]),
     ("build_routes.py", [], [WORK / "routes.parquet"]),
     ("dem.py", [], [WORK / "dem20.tif", WORK / "dem100.tif", WORK / "horizon.tif"]),
+    ("glyphs.py", [], [WEB_DATA / "glyphs" / "glyphs.webp", WEB_DATA / "glyphs" / "index.json"]),
 ]
 WEEKLY = [
     ("sentinel.py", ["--only", "now"], None),
     ("sentinel.py", ["--only", "summer"], [WORK / "s2_summer.tif"]),
     ("foliage.py", [], None),
     ("score.py", [], None),
+    ("official.py", ["fetch"], None),
     ("itineraries.py", [], None),
+    ("official.py", ["match"], None),
     ("weather.py", [], None),
     ("photos.py", [], None),
     ("webcams.py", [], None),

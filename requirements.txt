@@ -5,3 +5,5 @@ shapely>=2.0
 pyproj>=3.6
 scipy>=1.13
 pillow>=10
+pyshp>=2.3
+freetype-py>=2.4

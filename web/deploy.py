@@ -20,7 +20,7 @@ from pathlib import Path
 WEB = Path(__file__).resolve().parent
 REPO = WEB.parent
 BRANCH = "gh-pages"
-DATA = ["hikes.json", "pois.json", "details", "tiles", "photos"]
+DATA = ["hikes.json", "pois.json", "labels.json", "details", "tiles", "photos", "glyphs"]
 
 # the artifact host adds the document skeleton; a plain web server does not
 HEAD = """<!doctype html>
