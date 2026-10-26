@@ -5,6 +5,8 @@ outputs are missing, e.g. in a fresh environment. Run from the pipeline folder:
 
     ../.venv/bin/python update.py            # weekly refresh
     ../.venv/bin/python update.py --all      # rebuild everything from scratch
+
+Then ../.venv/bin/python ../web/deploy.py publishes the site on the gh-pages branch.
 """
 import argparse
 import subprocess

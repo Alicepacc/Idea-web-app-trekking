@@ -49,7 +49,25 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 cd pipeline && ../.venv/bin/python update.py
 ```
 
-Un'attività programmata lo esegue ogni giovedì sera e ripubblica la pagina.
+Un'attività programmata lo esegue ogni giovedì sera, ripubblica la pagina e aggiorna il sito della demo.
+
+## Aprire la demo fuori da claude.ai
+
+Il ramo `gh-pages` contiene il sito pronto, pagina e dati (circa 85 MB), creato da `web/deploy.py`.
+A ogni aggiornamento il ramo viene sostituito, così i dati vecchi non si accumulano nella storia del repository.
+Si può pubblicare in uno di questi modi:
+
+- **GitHub Pages**: Settings → Pages → Build and deployment → "Deploy from a branch" → `gh-pages`, cartella `/ (root)`.
+  Indirizzo: `https://alicepacc.github.io/Idea-web-app-trekking/`. Con il repository privato serve un piano
+  GitHub a pagamento; il sito pubblicato è comunque visibile a tutti.
+- **Cloudflare Pages** (gratuito anche con il repository privato): Workers & Pages → Create → Pages → collega
+  il repository, ramo di produzione `gh-pages`, nessun framework, comando di build vuoto, cartella di output `/`.
+- **Sul computer**: scarica il ramo `gh-pages` (Code → Download ZIP), estrailo e nella cartella esegui
+  `python3 -m http.server`, poi apri http://localhost:8000. Aprire `index.html` con un doppio clic non funziona:
+  la pagina carica i dati dalla sua cartella e il browser lo permette solo da un server.
+
+Fuori da claude.ai la pagina non ha i limiti degli artifact: si potranno aggiungere il download delle tracce GPX,
+le immagini delle webcam dal vivo e mappe di altri servizi.
 
 ## Fonti e licenze (da rispettare per il lancio pubblico)
 
