@@ -182,9 +182,16 @@ def licences(files):
 
 
 def thumbnail(meta):
-    try:
-        data = get(meta["thumb"])
-    except urllib.error.HTTPError:  # pictures narrower than 960 px have no such thumbnail
+    data = None
+    # pictures narrower than a thumbnail size have no thumbnail at that size: try smaller ones,
+    # and the original (the most rate-limited request) only as a last resort
+    for width in (960, 500, 330):
+        try:
+            data = get(meta["thumb"].replace("/960px-", f"/{width}px-"), attempts=2)
+            break
+        except urllib.error.HTTPError:
+            continue
+    if data is None:
         data = get(meta["original"])
     img = Image.open(io.BytesIO(data)).convert("RGB")
     if img.width > OUT_W:
