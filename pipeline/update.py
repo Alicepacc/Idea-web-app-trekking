@@ -3,8 +3,9 @@
 Steps whose inputs rarely change (trail network, terrain) run only when their
 outputs are missing, e.g. in a fresh environment. Run from the pipeline folder:
 
-    ../.venv/bin/python update.py            # weekly refresh
-    ../.venv/bin/python update.py --all      # rebuild everything from scratch
+    ../.venv/bin/python update.py                    # weekly refresh
+    ../.venv/bin/python update.py --all              # rebuild everything from scratch
+    ../.venv/bin/python update.py --from weather.py  # resume at a step that failed
 
 Then ../.venv/bin/python ../web/deploy.py publishes the site on the gh-pages branch.
 """
@@ -55,8 +56,15 @@ def run(script, args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--all", action="store_true", help="rebuild every step")
+    ap.add_argument("--from", dest="start", metavar="SCRIPT", help="skip the steps before this one")
     args = ap.parse_args()
-    for script, extra, outputs in STABLE + WEEKLY:
+    steps = STABLE + WEEKLY
+    if args.start:
+        names = [s[0] for s in steps]
+        if args.start not in names:
+            ap.error(f"unknown step {args.start}")
+        steps = steps[names.index(args.start):]
+    for script, extra, outputs in steps:
         if not args.all and outputs and all(p.exists() for p in outputs):
             print(f"--- {script} {' '.join(extra)}: up to date")
             continue

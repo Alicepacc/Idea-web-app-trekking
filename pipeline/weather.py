@@ -30,6 +30,7 @@ DAILY = ["weather_code", "temperature_2m_max", "temperature_2m_min", "precipitat
          "precipitation_probability_max", "snowfall_sum", "wind_speed_10m_max", "wind_gusts_10m_max",
          "sunshine_duration"]
 UA = {"User-Agent": "SentieriAutunno/0.1 (hiking prototype; github.com/Alicepacc/Idea-web-app-trekking)"}
+ATTEMPTS = 60
 
 
 def weekend(today=None):
@@ -53,7 +54,13 @@ def grid_points():
 
 
 def fetch(points, elevation, days, batch_size=20):
-    """Open-Meteo counts each location as one call (600 per minute on the free API), so go slowly."""
+    """Open-Meteo counts each location as one call (600 per minute on the free API), so go slowly.
+
+    The free API also has daily and hourly limits per network address. This network goes out
+    from several shared addresses, some of them already over the daily limit because of other
+    users: a refusal for that reason is retried within seconds, which usually goes out from
+    another address. Only the per-minute limit is worth waiting for.
+    """
     out = []
     for i in range(0, len(points), batch_size):
         batch = points[i:i + batch_size]
@@ -64,19 +71,20 @@ def fetch(points, elevation, days, batch_size=20):
             "start_date": days[0].isoformat(), "end_date": days[-1].isoformat(),
         }
         url = f"{API}?{urllib.parse.urlencode(q)}"
-        for attempt in range(6):
+        for attempt in range(ATTEMPTS):
             try:
-                with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60) as r:
+                with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=45) as r:
                     data = json.load(r)
                 break
             except urllib.error.HTTPError as e:
-                if e.code != 429 or attempt == 5:
+                if e.code != 429 or attempt == ATTEMPTS - 1:
                     raise
-                time.sleep(65)  # minute quota used up
+                reason = e.read().decode("utf-8", "replace")
+                time.sleep(65 if "Minutely" in reason else 4)
             except OSError:
-                if attempt == 5:
+                if attempt == ATTEMPTS - 1:
                     raise
-                time.sleep(2 ** attempt)
+                time.sleep(4)
         out += data if isinstance(data, list) else [data]
         time.sleep(2.5)
     return out
